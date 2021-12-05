@@ -17,6 +17,7 @@ Initialize First Generation
 # Globals
 counter = 100000
 current_year = 0
+total_pop = 1000
 
 
 def inherit(p1, p2, genome=False):
@@ -154,7 +155,7 @@ class Organism:
         # Inherit Mutation Matrix
         # Then mutate their genome
         if first_gen:
-            tempGenome = "ATCCGTGCGTGACTA"
+            tempGenome = "ATCCATGCGTGACTA"
             tempMutation_Matrix = [0.5 for r in range(14)]
             self.parent1id = parent1
             self.parent2id = parent2
@@ -177,12 +178,14 @@ class Organism:
         if "NonViable" in features:
             self.viable = False
             self.alive = False
+            self.murderer = "NonViable"
         else:
             self.viable = True
             self.alive = True
+            self.murderer = None
 
         # Evaluate Resource Requirements
-        resources_required = 7
+        resources_required = 6
         if self.size == "Large":
             resources_required += 1
         if self.size == "Small":
@@ -197,9 +200,9 @@ class Organism:
         self.fights = 0
         self.escapes = 0
         self.id = counter + 1
-        self.murderer = None
         self.mate = None
         self.birthyear = current_year
+        self.age = 0
 
         counter += 1
 
@@ -210,13 +213,16 @@ class Organism:
         return {
             "ID": self.id,
             "Birth Year": self.birthyear,
+            "Age": self.age,
+            "Genome": self.Genome,
+            "MutationMatrix": self.mutation_matrix,
             "Parent1": self.parent1id,
             "Parent2": self.parent2id,
             "Behavior": self.behavior,
             "Size": self.size,
             "Speed": self.speed,
             "Resources Required": self.resource_demand,
-            "Resources Retreived": self.current_resources,
+            "Resources Retrieved": self.current_resources,
             "# of Fights": self.fights,
             "# of Escapes": self.escapes,
             "Murderer": self.murderer,
@@ -224,12 +230,24 @@ class Organism:
             "Mate": self.mate
         }
 
+    def age_one_year(self):
+        self.age += 1
 
-def removeDead(organism_list):
-    return [x for x in organism_list if x.alive]
+
+class OrganismList:
+    def __init__(self, list_of_organisms):
+        self.organisms = list_of_organisms
+
+    def total_alive(self):
+        return len([n for n in self.organisms if n.alive == True])
+
+    def total_dead(self):
+        return len([n for n in self.organisms if n.alive == False])
 
 
-def organism_fight(org1, org2):
+# TODO: REFACTOR
+def organism_fight(org1, org2, Orgs):
+    global total_pop
     print("-------FIGHT-------")
     print(org1.id)
     print(org1.behavior)
@@ -260,18 +278,17 @@ def organism_fight(org1, org2):
     if org1_roll > org2_roll:
         print(org2.id, " Dies")
         org2.alive = False
-        org1.current_resources += 2 + org2.current_resources
+        org1.current_resources += 4 * (total_pop/Orgs.total_alive()) + org2.current_resources
     elif org2_roll >= org1_roll:
         print(org2.id, " escapes!")
-        org1.current_resources -= 1
-        org2.current_resources += 1
 
     org1.fights += 1
     org2.fights += 1
 
 
-def Foraging(org):
-    if org.behavior == "Timid" and org.alive:
+def Foraging(org, Orgs):
+    global total_pop
+    if org.behavior == "Timid" and org.alive == True:
         print(org.id, " is foraging!")
         odds = 0
         if org.speed == "Fast":
@@ -280,7 +297,8 @@ def Foraging(org):
             odds -= 1
 
         # Random Forage Amount
-        ForageAmt = random.randint(2, 4)
+        ForageAmt = random.randint(2, 3)
+        ForageAmt = ForageAmt * (total_pop/Orgs.total_alive())
         org_roll = random.randint(1, 6) + odds
 
         # Evaluate Roll
@@ -295,36 +313,57 @@ def Foraging(org):
 
 
 def reproduce(org_list):
+    out_list = []
     for org in org_list:
-        if org.alive:
+        if org.alive == True and org.current_resources >= org.resource_demand:
+            print("attempting repro")
             have_not_reproduced = True
+            second_reproduction = False
             while have_not_reproduced:
+                if len(org_list) <= 1:
+                    print("No one to reproduce with, fatal for all")
+                    have_not_reproduced = False
                 randomPick = sample(range(len(org_list)), 1)
                 rand_Org = org_list[randomPick[0]]
-                if rand_Org.id != org.id and rand_Org.alive:
+                if rand_Org.id != org.id and rand_Org.alive == True:
                     print(f"{org.id} is mating with {rand_Org.id}")
-                    org_list.append(Organism(org, rand_Org))
+                    out_list.append(Organism(org, rand_Org))
+                    out_list.append(Organism(org, rand_Org))
+                    out_list.append(Organism(org, rand_Org))
                     org.mate = rand_Org.id
                     rand_Org.mate = org.id
-                    have_not_reproduced = False
+                    if org.current_resources / 2 >= org.resource_demand and second_reproduction == False:
+                        second_reproduction = True
+                    else:
+                        second_reproduction = False
+
+                    if not second_reproduction:
+                        have_not_reproduced = False
+
+    return out_list
 
 
-def year(organism_list, n_years=1, beginning_year=0):
+def year(Orgs, n_years=1, beginning_year=0):
+    global current_year
+    current_year = beginning_year
     for i in range(n_years):
-        organisms = organism_list
+        organisms = Orgs.organisms
         # plentiful (How many resources happen to be available this generation
         plentiful = random.randint(0, 3)
 
         # All Hostile Creatures Must Fight
         for org in organisms:
             org.current_resources += plentiful  # All organisms benefit from nature's bounty
-            if org.behavior == "Hostile" and org.alive:
+            if org.behavior == "Hostile" and org.alive == True:
                 fight = False
                 have_not_fought = True
                 while have_not_fought:
+                    if len(organisms) <= 2:
+                        print("No one to fight.")
+                        have_not_fought = False
                     randomPick = sample(range(len(organisms)), 1)
                     rand_Org = organisms[randomPick[0]]
-                    if rand_Org.id != org.id and rand_Org.alive:
+                    if rand_Org.id != org.id and rand_Org.alive == True:
                         if rand_Org.behavior == "Timid":
                             luck_roll = random.randint(1, 20)
                             if luck_roll < 10:
@@ -332,61 +371,72 @@ def year(organism_list, n_years=1, beginning_year=0):
                         else:
                             fight = True
                         if fight:
-                            organism_fight(org, rand_Org)
+                            organism_fight(org, rand_Org, Orgs)
                             have_not_fought = False
 
-        print("Remaining After Hunt", len(organisms))
+        print("Remaining After Hunt", Orgs.total_alive())
 
         # Foraging
         for org in organisms:
-            Foraging(org)
+            Foraging(org, Orgs)
 
         # All Hostile Creatures Must Fight
         for org in organisms:
-            if org.behavior == "Hostile":
+            org.current_resources += plentiful  # All organisms benefit from nature's bounty
+            if org.behavior == "Hostile" and org.alive == True:
                 fight = False
                 have_not_fought = True
                 while have_not_fought:
+                    if len(organisms) <= 2:
+                        print("No one to fight.")
+                        have_not_fought = False
                     randomPick = sample(range(len(organisms)), 1)
                     rand_Org = organisms[randomPick[0]]
-                    if rand_Org.behavior == "Timid":
-                        luck_roll = random.randint(1, 20)
-                        if luck_roll < 10:
-                            fight = True
+                    if rand_Org.id != org.id and rand_Org.alive == True:
+                        if rand_Org.behavior == "Timid":
+                            luck_roll = random.randint(1, 20)
+                            if luck_roll < 10:
+                                fight = True
                         else:
                             fight = True
                         if fight:
-                            organism_fight(org, organisms[randomPick[0]])
+                            organism_fight(org, rand_Org, Orgs)
                             have_not_fought = False
 
         print("Remaining After Second Hunt", len(organisms))
 
         # Foraging
         for org in organisms:
-            Foraging(org)
-            if org.current_resources < org.resource_demand and org.alive:
+            Foraging(org, Orgs)
+            if org.current_resources < org.resource_demand * 0.75 and org.alive == True:
                 print(org.id, "did not get enough to eat.")
                 print(f"{org.id} got {org.current_resources}/{org.resource_demand}")
                 org.alive = False
                 org.murderer = "Starvation"
 
-        print("-----------END OF YEAR-----------")
+        print(f"-----------ENDING YEAR {i}-----------")
 
         df = pd.DataFrame.from_records([org.to_dict() for org in organisms])
 
         df.to_csv(f"{i}_year_10K.csv")
-        beginning_year += 1
+        current_year += 1
+
+        children = reproduce(organisms)
+
         for org in organisms:
+            org.age_one_year()
             org.reset_resources()
 
-        reproduce(organisms)
+        Orgs.organisms += children
+
+
 
 
 if __name__ == '__main__':
     # Create 12 organisms
     organisms = []
-    for i in range(1000000):
+    for i in range(1000):
         organisms.append(Organism(first_gen=True))
 
-    year(organisms, 10, current_year)455555555555555555555555555555555559
-    Y/
+    Orgs = OrganismList(organisms)
+    year(Orgs, 150, current_year)

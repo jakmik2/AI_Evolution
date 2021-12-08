@@ -8,8 +8,8 @@ pd.set_option('display.max_columns', None)
 # Build out using Numpy Arrays
 
 # Globals
-World = np.array([['ID', "Age", 'Genome', 'Mutation Matrix', 'Parent 1 ID', 'Parent 2 ID', 'Behavior', 'Size', 'Speed',
-                   'Resource Demand', 'Current Resources', 'Fights', 'Escapes', 'Murderer', 'Alive', 'Mate']],
+World = np.array([[0, 1, 2, 3, 4, 5, 6, 7, 8,
+                   9, 10, 11, 12, 13, 14, 15]],
                  dtype=object)
 
 """
@@ -176,8 +176,8 @@ def newOrg(p1index="", p2index=""):
         resources_required -= 2
 
     # Add the new organism
-    World = np.append(World, [[World.size/16, 0, genome, mm, parent1, parent2, features[0], features[1], features[2],
-                              resources_required, 0, 0, 0, None, not any([n == "NonViable" for n in features]), None]],
+    World = np.append(World, [[World.size / 16, 0, genome, mm, parent1, parent2, features[0], features[1], features[2],
+                               resources_required, 0, 0, 0, None, not any([n == "NonViable" for n in features]), None]],
                       axis=0)
 
 
@@ -188,13 +188,63 @@ Construction of each Array in NP Array:
 """
 
 
+def super_func(function, index):
+    global World
+
+    World[:, index] = np.apply_along_axis(function, 1, World)
+
+
+def get_total_pop():
+    global World
+
+    return int(World.size // 16) - 1
+
+
+def get_total_alive():
+    global World
+
+    return len([n for n in World[:, 14] if n == True])
+
+
+def forage():
+    super_func(forage_sp, 10)
+
+
+def forage_sp(a):
+    total_pop = get_total_pop()
+    total_alive = get_total_alive()
+
+    if a[6] == "Timid" and a[14] == True:
+        print('in')
+        odds = 0
+        if a[8] == "Fast":
+            odds += 1
+        if a[7] == "Slow":
+            odds -= 1
+
+        ForageAmt = random.randint(1, 3)
+        ForageAmt = ForageAmt * total_pop / total_alive
+        org_roll = random.randint(1, 6) + odds
+
+        if org_roll <= 1:
+            foraged = 0
+        elif org_roll < 3:
+            foraged = ForageAmt / 2
+        elif org_roll >= 3:
+            foraged = ForageAmt
+        return a[10] + foraged
+    else:
+        return int(a[10])
+    
+
 if __name__ == '__main__':
     # Create 12 organisms
     print(World)
-    for i in range(12):
+    for i in range(50):
         newOrg()
 
-    df = pd.DataFrame(World[1:World.size//16], columns=World[0])
-    print(df)
+    print(World)
 
+    forage()
 
+    print(World)

@@ -1,21 +1,24 @@
+import os
+import time
 import random
 from random import sample
 import pandas as pd
 import numpy as np
+from timeit import default_timer as timer
+import math
+import numba
+from numba import jit
+
 
 pd.set_option('display.max_columns', None)
 
 # Build out using Numpy Arrays
 
-# Globals
-World = np.array([[0, 1, 2, 3, 4, 5, 6, 7, 8,
-                   9, 10, 11, 12, 13, 14, 15]],
-                 dtype=object)
 
 """
 Construction of each Array in NP Array:
 [0 Unique Index, 1 Age, 2 Genome, 3 Mutation Matrix, 4 Parent 1 ID, 5 Parent 2 ID, 6 Behavior, 7 Size, 8 Speed, 
-9 Resource Demand, 10 Current Resources, 11 Fights, 12 Escapes, 13 Murderer, 14 Alive,  15 Mate]
+9 Resource Demand, 10 Current Resources, 11 Fights, 12 Escapes, 13 Murderer, 14 Alive,  15 Mate 16]
 """
 
 
@@ -144,7 +147,7 @@ def inherit(p1, p2, genome=False):
     return child
 
 
-def newOrg(p1index="", p2index=""):
+def newOrg(p1index="", p2index="", firstOrg=False):
     global World
 
     # Inherit or Initialize
@@ -176,30 +179,40 @@ def newOrg(p1index="", p2index=""):
         resources_required -= 2
 
     # Add the new organism
-    World = np.append(World, [[World.size / 16, 0, genome, mm, parent1, parent2, features[0], features[1], features[2],
-                               resources_required, 0, 0, 0, None, not any([n == "NonViable" for n in features]), None]],
+    if firstOrg:
+        World = np.array([[0, 0, genome, mm, parent1, parent2, features[0], features[1], features[2], resources_required,
+                           0, 0, 0, None, not any([n == "NonViable" for n in features]), "None", None]])
+
+    World = np.append(World, [[World[np.size(World, 0)-1][0]+1, 0, genome, mm, parent1, parent2, features[0], features[1], features[2],
+                               resources_required, 0, 0, 0, None, not any([n == "NonViable" for n in features]), "None",
+                               None]],
                       axis=0)
 
 
 """
 Construction of each Array in NP Array:
 [0 Unique Index, 1 Age, 2 Genome, 3 Mutation Matrix, 4 Parent 1 ID, 5 Parent 2 ID, 6 Behavior, 7 Size, 8 Speed, 
-9 Resource Demand, 10 Current Resources, 11 Fights, 12 Escapes, 13 Murderer, 14 Alive,  15 Mate]
+9 Resource Demand, 10 Current Resources, 11 Fights, 12 Escapes, 13 Murderer, 14 Alive,  15 Mate, 16 TAG]
 """
 
 
-def super_func(function, index):
+## Could this be a property of data type 'World'?
+def super_func(function, index, key=None):
     global World
+    if key is not None:
+        World[:, index] = np.apply_along_axis(function, 1, World, key)
+    else:
+        World[:, index] = np.apply_along_axis(function, 1, World)
 
-    World[:, index] = np.apply_along_axis(function, 1, World)
 
-
+## Could this be a propery of data type 'World'?
 def get_total_pop():
     global World
 
-    return int(World.size // 16) - 1
+    return int(np.size(World, 0)) - 1
 
 
+## Could this be a propery of data type 'World'?
 def get_total_alive():
     global World
 
@@ -207,44 +220,226 @@ def get_total_alive():
 
 
 def forage():
+    global initialPop
+
+    def forage_sp(a):
+        total_alive = get_total_alive()
+
+        if a[6] == "Timid" and a[14] == True:
+            odds = 0
+            if a[8] == "Fast":
+                odds += 1
+            if a[7] == "Slow":
+                odds -= 1
+
+            ForageAmt = random.randint(1, 3)
+            ForageAmt = ForageAmt * initialPop / total_alive
+            org_roll = random.randint(1, 6) + odds
+
+            if org_roll <= 1:
+                foraged = 0
+            elif org_roll < 3:
+                foraged = ForageAmt / 2
+            elif org_roll >= 3:
+                foraged = ForageAmt
+            return a[10] + foraged
+        else:
+            return a[10]
+
     super_func(forage_sp, 10)
 
 
-def forage_sp(a):
-    total_pop = get_total_pop()
-    total_alive = get_total_alive()
+def starvation():
+    # I don't like this, would rather fix this up to not have to double call super_func
+    def starvation_sp1(a):
+        if a[6] == 6:
+            return True
+        elif a[10] <= a[9] and a[14] == True:
+            a[13] = 'Starvation'
+            return False  # Alive
+        else:
+            return a[14]
 
-    if a[6] == "Timid" and a[14] == True:
-        print('in')
-        odds = 0
-        if a[8] == "Fast":
-            odds += 1
-        if a[7] == "Slow":
-            odds -= 1
+    super_func(starvation_sp1, 14)
 
-        ForageAmt = random.randint(1, 3)
-        ForageAmt = ForageAmt * total_pop / total_alive
-        org_roll = random.randint(1, 6) + odds
 
-        if org_roll <= 1:
-            foraged = 0
-        elif org_roll < 3:
-            foraged = ForageAmt / 2
-        elif org_roll >= 3:
-            foraged = ForageAmt
-        return a[10] + foraged
-    else:
-        return int(a[10])
-    
+def hunt():
+    global World
+
+    def hunt_sp(a):
+        if a[6] == 6:
+            return a[10]
+        if a[6] == "Hostile" and a[14] == True:
+            hunting = True
+            while hunting:
+                if get_total_alive() < 2:
+                    hunting = False
+                randomPick = sample(range(get_total_pop()), 1)
+                rand_Org = World[randomPick[0]]
+
+                if rand_Org[0] != a[0] and rand_Org[14] == True:
+                    # Determine Fight Score
+                    fighters = [6, 6]
+                    for index, org in enumerate([a, rand_Org]):
+                        if org[7] == "Large":
+                            fighters[index] += 1
+                        if org[7] == "Small":
+                            fighters[index] -= 1
+                        if org[8] == "Fast":
+                            fighters[index] += 1
+                        if org[8] == "Slow":
+                            fighters[index] -= 1
+
+                    # Roll
+                    org1_roll = random.randint(1, fighters[0])
+                    org2_roll = random.randint(1, fighters[1])
+
+                    caught = False
+
+                    if org1_roll > org2_roll:
+                        # Return an array of Trues and False
+                        caught = True
+                    else:
+                        hunting = False
+                    # Add Fights
+            World[a[0]][11] += 1
+            World[rand_Org[0]][11] += 1
+
+            # Check if Caught
+            if caught:
+                # Murder
+                World[rand_Org[0]][14] = False
+                World[rand_Org[0]][13] = a[0]
+
+                resources_earned = a[10] + 4 * (initialPop / get_total_alive()) + World[rand_Org[0]][10]
+            else:
+                # Escape
+                World[rand_Org[0]][12] += 1
+
+                resources_earned = a[10]
+            return resources_earned
+        else:
+            return a[10]
+
+    super_func(hunt_sp, 10)
+
+
+def reproduce():
+    global World
+
+    def repro_sp1(a): # Returns MATE column
+        global World
+
+        if a[6] == 6:
+            return 0
+        elif a[14] == True and a[10] >= a[9]:
+            if get_total_alive() < 2:
+                return 'Parthenogenesis'
+            #Find viable mate
+            while True:
+                randomPick = sample(range(get_total_pop()), 1)
+                rand_Org = World[randomPick[0]]
+
+                if rand_Org[0] != a[0] and rand_Org[14] == True:
+                    if a[10] // 2 > a[9]:
+                        a[16] = "Double Reproduction"
+                    return rand_Org[0]
+        return 0
+
+    def repro_sp2(a): # Acts on MATE column
+        global World
+
+        if a[6] == 6:
+            return a[16]
+        elif a[15] != 0:
+            if a[15] == 'Parthenogenesis':
+                p2 = a[0]
+                fornicate = True
+            else:
+                p2 = a[15]
+                fornicate = True
+
+            dblrep = 1
+
+            if a[16] == "Double Reproduction":
+                dblrep = 2
+
+            if fornicate:
+                for nums in range(dblrep):
+                    for j in range(3):
+                        newOrg(a[0], p2)
+
+            a[16] = 'None'
+        return 0
+
+    super_func(repro_sp1, 15)
+    np.apply_along_axis(repro_sp2, 1, World)
+
+
+def purgeDead():
+    global World
+    global newIndex
+
+    newIndex = -1
+
+    def purge_sp1(a):
+        global newIndex
+
+        newIndex += 1
+        return newIndex
+
+    World = np.array([array for array in World if array[14] == True])
+
+    super_func(purge_sp1, 0)
+
+def reset():
+    global World
+
+    def reset_res_sp(a):
+        return 0
+
+    super_func(reset_res_sp, 10)
+
+
+def liveYears(n_years = 1):
+    # os.mkdir(f'{n_years}')
+    timeArray = []
+    for year in range(n_years):
+        print(f'--------------------YEAR {year} ------------------')
+        startTime = timer()
+        totAl = get_total_alive()
+        forage()
+        hunt()
+        forage()
+        hunt()
+        starvation()
+        reproduce()
+        df = pd.DataFrame(World)
+        # df.to_csv(f'{n_years}//{year}_dataframe.csv')
+        purgeDead()
+        reset()
+        endTime = timer()
+        timeArray.append((endTime-startTime)/totAl)
+
+
+    return timeArray
 
 if __name__ == '__main__':
+    global initialPop
+    start = timer()
     # Create 12 organisms
-    print(World)
-    for i in range(50):
+    newOrg(firstOrg=True)
+    for i in range(999):
         newOrg()
 
-    print(World)
+    initialPop = get_total_pop()
 
-    forage()
+    timeArr = liveYears(50)
+    end = timer()
+    print(end - start)
+    print("Average: ", sum(timeArr)/len(timeArr))
+    print("Longest: ", max(timeArr))
+    print("Quickest: ", min(timeArr))
 
-    print(World)
+
+

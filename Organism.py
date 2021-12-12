@@ -3,6 +3,7 @@ import numpy
 import pandas as pd
 import random
 from random import sample
+from timeit import default_timer as timer
 
 '''
 Initialize First Generation
@@ -17,7 +18,7 @@ Initialize First Generation
 # Globals
 counter = 100000
 current_year = 0
-total_pop = 400  # Max Environment can handle
+total_pop = 0  # Max Environment can handle
 
 
 def inherit(p1, p2, genome=False):
@@ -71,75 +72,40 @@ def mutate_matrix(mutation_matrix):
 
 def parseGenome(genome):
     # Behavior: Hostile / Timid
-    behavior_dict = {
-        "AT": "Hostile",
-        "AC": "Hostile",
-        "CA": "Hostile",
-        "TA": "Hostile",
-        "AA": "Hostile",
-        "GG": "Hostile",
-        "GT": "Timid",
-        "GC": "Timid",
-        "CG": "Timid",
-        "TC": "Timid",
-        "TT": "Timid",
-        "CC": "Hostile",
-        "AG": "Hostile",
-        "GA": "Timid",
-        "CT": "Timid",
-        "TG": "NonViable"
-    }
-    # Size: Large / Medium / Small
-    size_dict = {
-        "AT": "Large",
-        "AC": "Medium",
-        "CA": "Small",
-        "TA": "Medium",
-        "GT": "Large",
-        "GC": "Medium",
-        "CG": "Small",
-        "TC": "Medium",
-        "AG": "Large",
-        "GA": "Medium",
-        "CT": "Small",
-        "TG": "Medium",
-        "AA": "Large",
-        "TT": "Medium",
-        "CC": "Small",
-        "GG": "NonViable"
-    }
 
-    # Speed: Fast / Average / Slow
-    speed_dict = {
-        "AT": "Fast",
-        "AC": "Fast",
-        "CA": "NonViable",
-        "TA": "Average",
-        "GT": "Average",
-        "GC": "Slow",
-        "CG": "Average",
-        "TC": "Average",
-        "AG": "Average",
-        "GA": "Slow",
-        "CT": "Slow",
-        "TG": "Average",
-        "AA": "Fast",
-        "TT": "Average",
-        "GG": "Slow",
-        "CC": "Average"
-    }
+    def generateParseDict():
+        base_list = ['A', 'T', 'C', 'G']
+
+        new_dict = {}
+
+        counter = -1
+
+        for base1 in base_list:
+            for base2 in base_list:
+                new_dict[base1 + base2] = counter
+                counter += 1
+
+        return new_dict
+
+    # {'AA': -1, 'AT': 0, 'AC': 1, 'AG': 2, 'TA': 3, 'TT': 4, 'TC': 5, 'TG': 6, 'CA': 7, 'CT': 8, 'CC': 9, 'CG': 10, 'GA': 11, 'GT': 12, 'GC': 13, 'GG': 14}
+
+    parseDict = generateParseDict()
+
     output_list = []
 
     # Check Valid Primer
     if genome[:3] == "ATC":
         # Valid
         # Evaluate Behavior
-        output_list.append(behavior_dict[genome[4:6]])
+        output_list.append(parseDict[genome[4:6]])
         # Evaluate Size
-        output_list.append(size_dict[genome[7:9]])
+        output_list.append(parseDict[genome[7:9]])
         # Evaluate Speed
-        output_list.append(speed_dict[genome[10:12]])
+        output_list.append(parseDict[genome[10:12]])
     else:
+        output_list = ["NonViable" for x in range(3)]
+
+    if any(["NonViable" for x in output_list if x == -1 or x == 14]):
         output_list = ["NonViable" for x in range(3)]
 
     return output_list
@@ -179,23 +145,13 @@ class Organism:
             self.viable = False
             self.alive = False
             self.murderer = "NonViable"
+            self.resource_demand = 0
         else:
             self.viable = True
             self.alive = True
             self.murderer = None
+            self.resource_demand = (self.size ** 3) * (self.speed ** 2)
 
-        # Evaluate Resource Requirements
-        resources_required = 6
-        if self.size == "Large":
-            resources_required += 1
-        if self.size == "Small":
-            resources_required -= 1
-        if self.speed == "Fast":
-            resources_required += 1
-        if self.speed == "Slow":
-            resources_required -= 2
-
-        self.resource_demand = resources_required
         self.current_resources = 0
         self.fights = 0
         self.escapes = 0
@@ -203,6 +159,7 @@ class Organism:
         self.mate = None
         self.birthyear = current_year
         self.age = 0
+        self.decision = None
 
         counter += 1
 
@@ -253,31 +210,32 @@ class OrganismList:
         self.organisms = [n for n in self.organisms if n.alive == True]
 
     def the_forage_super(self):
-        print("Foraging!")
         [self.forage_subprocess(n) for n in self.organisms]
 
     def forage_subprocess(self, org):
-        if org.behavior == "Timid" and org.alive == True:
-            odds = 0
-            if org.speed == "Fast":
-                odds += 1
-            if org.speed == "Slow":
-                odds -= 1
+        if (org.decision is None or org.decision == "Forage") and org.alive == True:
+            if org.behavior < random.randint(1, 13) or org.decision == "Forage":
+                odds = 0
+                odds += org.size / 2 - 3
+                odds += org.speed / 2 - 3
 
-            # Random Forage Amount
-            ForageAmt = random.randint(1, 3)
-            ForageAmt = ForageAmt * (total_pop / self.total_alive())
-            org_roll = random.randint(1, 6) + odds
+                # Random Forage Amount
+                ForageAmt = random.randint(1, 3)
+                ForageAmt = ForageAmt * (total_pop // self.total_alive())
+                org_roll = random.randint(1, 6) + odds
 
-            # Evaluate Roll
-            if org_roll <= 1:
-                foraged = 0
-            elif org_roll < 3:
-                foraged = ForageAmt / 2
-            elif org_roll >= 3:
-                foraged = ForageAmt
+                # Evaluate Roll
+                if org_roll <= 1:
+                    foraged = 0
+                elif org_roll < 3:
+                    foraged = ForageAmt // 2
+                elif org_roll >= 3:
+                    foraged = ForageAmt
 
-            org.current_resources += foraged
+                org.current_resources += foraged
+                org.decision = None
+            else:
+                org.decision == "Hunt"
 
     def starved_super(self):
         [self.starved_subprocess(n) for n in self.organisms]
@@ -289,49 +247,46 @@ class OrganismList:
             org.murderer = "Starvation"
 
     def the_hunt_super(self):
-        print("Hunting!")
         [self.hunt_subprocess(n) for n in self.organisms]
 
     def hunt_subprocess(self, org):
-        if org.behavior == "Hostile" and org.alive == True:
-            have_not_fought = True
-            while have_not_fought:
-                if self.total_alive() < 2:
-                    print("No one to fight.")
-                    have_not_fought = False
-                randomPick = sample(range(len(self.organisms)), 1)
-                rand_Org = self.organisms[randomPick[0]]
+        # Roll to check if fight
+        if (org.decision is None or org.decision == "Hunt") and org.alive == True:
+            if org.behavior > random.randint(1, 13) or org.decision == "Hunt":
+                have_not_fought = True
+                while have_not_fought:
+                    if self.total_alive() < 2:
+                        have_not_fought = False
+                    randomPick = sample(range(len(self.organisms)), 1)
+                    rand_Org = self.organisms[randomPick[0]]
 
-                if rand_Org.id != org.id and rand_Org.alive == True:
-                    self.org_fight(org, rand_Org)
-                    have_not_fought = False
+                    if rand_Org.id != org.id and rand_Org.alive == True:
+                        self.org_fight(org, rand_Org)
+                        have_not_fought = False
+                org.decision = None
+            else:
+                org.decision = "Forage"
 
     def org_fight(self, org1, org2):
         # Determine Fight Score
-        fighters = [6, 6]
-        for index, org in enumerate([org1, org2]):
-            if org.size == "Large":
-                fighters[index] += 1
-            if org.size == "Small":
-                fighters[index] -= 1
-            if org.speed == "Fast":
-                fighters[index] += 1
-            if org.speed == "Slow":
-                fighters[index] -= 1
+        # Try and catch
+        org1_dex_check = random.randint(1, 10) + org1.speed
+        org2_dex_check = random.randint(1, 10) + org2.speed
+        if org1_dex_check > org2_dex_check:
+            # Caught
+            # Attempt Fight
+            org1_fight_roll = random.randint(1, 10) + org1.size
+            org2_fight_roll = random.randint(1, 10) + org2.size
 
-        # Roll
-        org1_roll = random.randint(1, fighters[0])
-        org2_roll = random.randint(1, fighters[1])
-
-        if org1_roll > org2_roll:
-            org2.alive = False
-            org1.current_resources += 4 * (total_pop / self.total_alive()) + org2.current_resources
+            if org1_fight_roll > org2_fight_roll:
+                # Org 1 Wins
+                org2.alive = False
+                org1.current_resources += 4 * (total_pop // self.total_alive()) + org2.current_resources // 2
 
         org1.fights += 1
         org2.fights += 1
 
     def reproduce_super(self):
-        print("Reproducing")
         [n.age_one_year() for n in self.organisms]
         [self.reproduce_subprocess(n) for n in self.organisms]
         [n.reset_resources() for n in self.organisms]
@@ -342,7 +297,6 @@ class OrganismList:
             second_reproduction = False
             while have_not_reproduced:
                 if self.total_alive() <= 1:
-                    print("No one to reproduce with, fatal for all")
                     have_not_reproduced = False
                 randomPick = sample(range(len(self.organisms)), 1)
                 rand_Org = self.organisms[randomPick[0]]
@@ -364,13 +318,17 @@ class OrganismList:
 def year(Orgs, n_years=1, beginning_year=0):
     global current_year
     current_year = beginning_year
+    os.mkdir('original')
+    outArray = []
     for i in range(n_years):
+        start = timer()
+
+        print(f'--------------------YEAR {i} ------------------')
         # plentiful (How many resources happen to be available this generation
-        print(i)
+        living = Orgs.total_alive()
         plentiful = random.randint(0, 3)
         [n.add_resources(plentiful) for n in Orgs.organisms]
-        print(f"{Orgs.total_alive()} are alive currently")
-
+        print(Orgs.total_alive())
         # Forage
         Orgs.the_forage_super()
 
@@ -383,25 +341,40 @@ def year(Orgs, n_years=1, beginning_year=0):
 
         # Hunt
         Orgs.the_hunt_super()
-        print(f"{Orgs.total_alive()} are alive currently")
 
         df = pd.DataFrame.from_records([org.to_dict() for org in Orgs.organisms])
 
-        df.to_csv(f"{i}_year_10K.csv")
+        df.to_csv(f"original//{i}_year_10K.csv")
         current_year += 1
 
         # Reproduce and Age
         Orgs.reproduce_super()
 
         Orgs.purge_dead()
+        end = timer()
+
+        outArray.append((end - start) / living)
+
+    return outArray
 
 
 if __name__ == '__main__':
+    start = timer()
     # Create 12 organisms
     organisms = []
-    for i in range(400):
+    total_pop = 500
+    for i in range(total_pop):
         organisms.append(Organism(first_gen=True))
 
     Orgs = OrganismList(organisms)
+
+    print(Orgs.organisms[0].to_dict())
     n_years = 50
-    year(Orgs, n_years, current_year)
+    timeArr = year(Orgs, n_years, current_year)
+    end = timer()
+
+    print(end - start)
+
+    print("Average: ", sum(timeArr) / len(timeArr))
+    print("Longest: ", max(timeArr))
+    print("Quickest: ", min(timeArr))

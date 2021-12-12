@@ -78,7 +78,7 @@ def parseGenome(genome):
 
         new_dict = {}
 
-        counter = -1
+        counter = 1
 
         for base1 in base_list:
             for base2 in base_list:
@@ -87,7 +87,7 @@ def parseGenome(genome):
 
         return new_dict
 
-    # {'AA': -1, 'AT': 0, 'AC': 1, 'AG': 2, 'TA': 3, 'TT': 4, 'TC': 5, 'TG': 6, 'CA': 7, 'CT': 8, 'CC': 9, 'CG': 10, 'GA': 11, 'GT': 12, 'GC': 13, 'GG': 14}
+    # {'AA': 1, 'AT': 2, 'AC': 3, 'AG': 4, 'TA': 5, 'TT': 6, 'TC': 7, 'TG': 8, 'CA': 9, 'CT': 10, 'CC': 11, 'CG': 12, 'GA': 13, 'GT': 14, 'GC': 15, 'GG': 16}
 
     parseDict = generateParseDict()
 
@@ -105,7 +105,7 @@ def parseGenome(genome):
     else:
         output_list = ["NonViable" for x in range(3)]
 
-    if any(["NonViable" for x in output_list if x == -1 or x == 14]):
+    if any(["NonViable" for x in output_list if x == 1 or x == 16]):
         output_list = ["NonViable" for x in range(3)]
 
     return output_list
@@ -221,7 +221,7 @@ class OrganismList:
 
                 # Random Forage Amount
                 ForageAmt = random.randint(1, 3)
-                ForageAmt = ForageAmt * (total_pop // self.total_alive())
+                ForageAmt = ForageAmt * 200 * (total_pop // self.total_alive())
                 org_roll = random.randint(1, 6) + odds
 
                 # Evaluate Roll
@@ -235,14 +235,14 @@ class OrganismList:
                 org.current_resources += foraged
                 org.decision = None
             else:
-                org.decision == "Hunt"
+                org.decision = "Hunt"
 
     def starved_super(self):
         [self.starved_subprocess(n) for n in self.organisms]
 
-    @staticmethod
-    def starved_subprocess(org):
-        if org.current_resources < org.resource.demand:
+    # @staticmethod
+    def starved_subprocess(self, org):
+        if org.current_resources < org.resource_demand:
             org.alive = False
             org.murderer = "Starvation"
 
@@ -280,8 +280,9 @@ class OrganismList:
 
             if org1_fight_roll > org2_fight_roll:
                 # Org 1 Wins
+                print(f"{org1.id} ate {org2.id}")
                 org2.alive = False
-                org1.current_resources += 4 * (total_pop // self.total_alive()) + org2.current_resources // 2
+                org1.current_resources += 1000 * (total_pop // self.total_alive()) + org2.current_resources
 
         org1.fights += 1
         org2.fights += 1
@@ -293,11 +294,20 @@ class OrganismList:
 
     def reproduce_subprocess(self, org):
         if org.alive == True and org.current_resources >= org.resource_demand:
+            print(f'{org.id} attempting reproduction')
             have_not_reproduced = True
             second_reproduction = False
             while have_not_reproduced:
-                if self.total_alive() <= 1:
-                    have_not_reproduced = False
+                if self.total_alive() < 2:
+                    print("Parthenogenesis!")
+                    # Increase mutation at every node
+                    org.mutation_matrix = [x - 0.05 for x in org.mutation_matrix]
+                    # Reproduce 5 Times
+                    self.organisms.append(Organism(org, org))
+                    self.organisms.append(Organism(org, org))
+                    self.organisms.append(Organism(org, org))
+                    self.organisms.append(Organism(org, org))
+                    self.organisms.append(Organism(org, org))
                 randomPick = sample(range(len(self.organisms)), 1)
                 rand_Org = self.organisms[randomPick[0]]
                 if rand_Org.id != org.id and rand_Org.alive == True:
@@ -342,7 +352,10 @@ def year(Orgs, n_years=1, beginning_year=0):
         # Hunt
         Orgs.the_hunt_super()
 
-        df = pd.DataFrame.from_records([org.to_dict() for org in Orgs.organisms])
+        # Starvation
+        Orgs.starved_super()
+
+        # df = pd.DataFrame.from_records([org.to_dict() for org in Orgs.organisms])
 
         df.to_csv(f"original//{i}_year_10K.csv")
         current_year += 1
@@ -362,14 +375,14 @@ if __name__ == '__main__':
     start = timer()
     # Create 12 organisms
     organisms = []
-    total_pop = 500
+    total_pop = 1000
     for i in range(total_pop):
         organisms.append(Organism(first_gen=True))
 
     Orgs = OrganismList(organisms)
 
     print(Orgs.organisms[0].to_dict())
-    n_years = 50
+    n_years = 500
     timeArr = year(Orgs, n_years, current_year)
     end = timer()
 

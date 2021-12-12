@@ -1,6 +1,7 @@
 import os
-import numpy
+import numpy as np
 import pandas as pd
+import math
 import random
 from random import sample
 from timeit import default_timer as timer
@@ -87,7 +88,8 @@ def parseGenome(genome):
 
         return new_dict
 
-    # {'AA': 0.5, 'AT': 1.0, 'AC': 1.5, 'AG': 2.0, 'TA': 2.5, 'TT': 3.0, 'TC': 3.5, 'TG': 4.0, 'CA': 4.5, 'CT': 5.0, 'CC': 5.5, 'CG': 6.0, 'GA': 6.5, 'GT': 7.0, 'GC': 7.5, 'GG': 8.0}
+    # {'AA': 0.5, 'AT': 1.0, 'AC': 1.5, 'AG': 2.0, 'TA': 2.5, 'TT': 3.0, 'TC': 3.5, 'TG': 4.0, 'CA': 4.5, 'CT': 5.0,
+    # 'CC': 5.5, 'CG': 6.0, 'GA': 6.5, 'GT': 7.0, 'GC': 7.5, 'GG': 8.0}
 
     parseDict = generateParseDict()
 
@@ -111,10 +113,31 @@ def parseGenome(genome):
     return output_list
 
 
+def randomPosition(grid):
+    notFound = True
+    while notFound:
+        y_temp = random.randint(0, np.size(grid[0])-1)
+        x_temp = random.randint(0, np.size(grid[0])-1)
+        if grid[y_temp][x_temp] == 0:
+            return [y_temp, x_temp]
+
+
+def findNearestEmpty(grid, p1coors, p2coors):
+    # search around parents
+    for i in range(-1, 1):
+        for j in range(-1, 1):
+            if grid[p1coors[0]+i][p1coors[1]+j] == 0:
+                if not any(x == -1 or x == np.size(grid) + 1 for x in [p1coors[0]+i, p1coors[1]+j]):
+                    return [p1coors[0]+i, p1coors[1]+j]
+            if grid[p2coors[0]+i][p2coors[1]+j] == 0:
+                if not any(x == -1 or x == np.size(grid) + 1 for x in [p2coors[0]+i, p2coors[1]+j]):
+                    return [p2coors[0]+i, p2coors[1]+j]
+
+
 class Organism:
     # Implement Binary Tree genealogy
 
-    def __init__(self, parent1=None, parent2=None, first_gen=False):
+    def __init__(self, parent1=None, parent2=None, first_gen=False, Grid=None):
         global counter
         global current_year
         # Self Initialization
@@ -125,11 +148,22 @@ class Organism:
             tempMutation_Matrix = [0.5 for r in range(14)]
             self.parent1id = parent1
             self.parent2id = parent2
+
+            if Grid is None:
+                self.position = [0, 0] # y, x
+            else:
+                self.position = randomPosition(Grid)
+            # Find the empty tile nearest both parents
         else:
             tempGenome = inherit(parent1.Genome, parent2.Genome, genome=True)  # function for inheritance
             tempMutation_Matrix = inherit(parent1.mutation_matrix, parent2.mutation_matrix)
             self.parent1id = parent1.id
             self.parent2id = parent2.id
+            if Grid is None:
+                self.position = [0, 0]
+            else:
+                self.position = findNearestEmpty(Grid, parent1.position, parent2.position)
+            # Find Random position on Grid
 
         self.mutation_matrix = mutate_matrix(tempMutation_Matrix)
         self.Genome = mutate_genome(tempGenome, self.mutation_matrix)
@@ -159,7 +193,6 @@ class Organism:
         self.mate = None
         self.birthyear = current_year
         self.age = 0
-        self.decision = None
 
         counter += 1
 

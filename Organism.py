@@ -17,7 +17,7 @@ Initialize First Generation
 '''
 
 # Globals
-counter = 100000
+counter = 10000
 current_year = 0
 total_pop = 0  # Max Environment can handle
 

@@ -104,11 +104,13 @@ def parseGenome(genome):
         output_list.append(parseDict[genome[7:9]])
         # Evaluate Speed
         output_list.append(parseDict[genome[10:12]])
+        # Evalute Sight
+        output_list.append(parseDict[genome[13:15]])
     else:
-        output_list = ["NonViable" for x in range(3)]
+        output_list = ["NonViable" for x in range(4)]
 
     if any(["NonViable" for x in output_list if x == 0.5 or x == 8]):
-        output_list = ["NonViable" for x in range(3)]
+        output_list = ["NonViable" for x in range(4)]
 
     return output_list
 
@@ -118,7 +120,7 @@ def randomPosition(grid):
     while notFound:
         y_temp = random.randint(0, np.size(grid[0])-1)
         x_temp = random.randint(0, np.size(grid[0])-1)
-        if grid[y_temp][x_temp] == 0:
+        if grid[y_temp][x_temp] == 0: # Is Empty
             return [y_temp, x_temp]
 
 
@@ -144,8 +146,8 @@ class Organism:
         # Inherit Mutation Matrix
         # Then mutate their genome
         if first_gen:
-            tempGenome = "ATCTGTTGGTGATGA"
-            tempMutation_Matrix = [0.5 for r in range(14)]
+            tempGenome = "ATCTGTTGGTGATGATGA"
+            tempMutation_Matrix = [0.5 for r in range(17)]
             self.parent1id = parent1
             self.parent2id = parent2
 
@@ -173,6 +175,7 @@ class Organism:
         self.behavior = features[0]
         self.size = features[1]
         self.speed = features[2]
+        self.vision = 2
 
         # Check if Viable
         if "NonViable" in features:
@@ -225,6 +228,40 @@ class Organism:
 
     def age_one_year(self):
         self.age += 1
+
+    def move(self, direction):
+        if direction == "N":
+            self.position[0] += 1
+        elif direction == "S":
+            self.position[0] -= 1
+        elif direction == "E":
+            self.position[1] += 1
+        else: # W
+            self.position[1] -= 1
+
+    def sight(self, Grid):
+        return np.array([[Grid[self.position[0]-3+i][self.position[1]-3+j] if (i != 2 or j != 2) else "X" for j in range(5)] for i in range(5)])
+
+    def find(self, visGrid, objectType):
+        if objectType in visGrid:
+            # Is here, time to find
+            # for row in visGrid:
+                # if
+        else:
+            return None
+
+    def forage(self):
+        pass
+
+    def fight(self):
+        pass
+
+    def reproduce(self):
+        pass
+
+    def decide(self, Grid):
+        visableGrid = self.sight(Grid)
+
 
 
 class OrganismList:

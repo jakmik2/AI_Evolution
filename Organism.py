@@ -17,7 +17,7 @@ Initialize First Generation
 '''
 
 # Globals
-counter = 10000
+counter = 1000
 current_year = 0
 total_pop = 0  # Max Environment can handle
 
@@ -118,9 +118,9 @@ def parseGenome(genome):
 def randomPosition(grid):
     notFound = True
     while notFound:
-        y_temp = random.randint(0, np.size(grid[0])-1)
-        x_temp = random.randint(0, np.size(grid[0])-1)
-        if grid[y_temp][x_temp] == 0: # Is Empty
+        y_temp = random.randint(0, np.size(grid[0]) - 1)
+        x_temp = random.randint(0, np.size(grid[0]) - 1)
+        if grid[y_temp][x_temp] == 0:  # Is Empty
             return [y_temp, x_temp]
 
 
@@ -128,12 +128,12 @@ def findNearestEmpty(grid, p1coors, p2coors):
     # search around parents
     for i in range(-1, 1):
         for j in range(-1, 1):
-            if grid[p1coors[0]+i][p1coors[1]+j] == 0:
-                if not any(x == -1 or x == np.size(grid) + 1 for x in [p1coors[0]+i, p1coors[1]+j]):
-                    return [p1coors[0]+i, p1coors[1]+j]
-            if grid[p2coors[0]+i][p2coors[1]+j] == 0:
-                if not any(x == -1 or x == np.size(grid) + 1 for x in [p2coors[0]+i, p2coors[1]+j]):
-                    return [p2coors[0]+i, p2coors[1]+j]
+            if grid[p1coors[0] + i][p1coors[1] + j] == 0:
+                if not any(x == -1 or x == np.size(grid) + 1 for x in [p1coors[0] + i, p1coors[1] + j]):
+                    return [p1coors[0] + i, p1coors[1] + j]
+            if grid[p2coors[0] + i][p2coors[1] + j] == 0:
+                if not any(x == -1 or x == np.size(grid) + 1 for x in [p2coors[0] + i, p2coors[1] + j]):
+                    return [p2coors[0] + i, p2coors[1] + j]
 
 
 class Organism:
@@ -152,7 +152,7 @@ class Organism:
             self.parent2id = parent2
 
             if Grid is None:
-                self.position = [0, 0] # y, x
+                self.position = [0, 0]  # y, x
             else:
                 self.position = randomPosition(Grid)
             # Find the empty tile nearest both parents
@@ -236,21 +236,72 @@ class Organism:
             self.position[0] -= 1
         elif direction == "E":
             self.position[1] += 1
-        else: # W
+        else:  # W
             self.position[1] -= 1
 
     def sight(self, Grid):
-        return np.array([[Grid[self.position[0]-3+i][self.position[1]-3+j] if (i != 2 or j != 2) else "X" for j in range(5)] for i in range(5)])
-
-    def find(self, visGrid, objectType):
-        if objectType in visGrid:
-            # Is here, time to find
-            # for row in visGrid:
-                # if
+        y_lim = 5
+        x_lim = 5
+        x_origin = 2
+        y_origin = 2
+        if (0 not in self.position and np.size(Grid[0]) - 1 not in self.position) and \
+                (1 not in self.position and np.size(Grid[0]) - 2 not in self.position):
+            pass
         else:
-            return None
+            if 0 == self.position[0]:  # Within 1 of Upper Wall
+                y_origin = 0
+                y_lim = 3
+            elif 1 == self.position[0]:  # Within 2 of Upper Wall
+                y_origin = 1
+                y_lim = 4
+            elif np.size(Grid[0]) - 1 == self.position[0]:  # Within 1 of Lower Wall
+                y_lim = 3
+            elif np.size(Grid[0]) - 2 == self.position[0]:  # Within 1 of Lower Wall
+                y_lim = 4
 
-    def forage(self):
+            if 0 == self.position[1]:  # Within 1 of Left Wall
+                x_origin = 0
+                x_lim = 3
+            elif 1 == self.position[1]:  # Within 2 of Left Wall
+                x_origin = 1
+                x_lim = 4
+            elif np.size(Grid[0]) - 1 == self.position[1]:  # Within 1 of Right Wall
+                x_lim = 3
+            elif np.size(Grid[0]) - 2 == self.position[1]:  # Within 2 of Right Wall
+                x_lim = 4
+
+        return np.array([[Grid[self.position[0] - y_origin + i][self.position[1] - x_origin + j]
+                          if (i != y_origin or j != x_origin) else "X" for j in range(x_lim)] for i in
+                         range(y_lim)])
+
+    def findObjectsInSight(self, Grid):
+        def calcDistance(objectCoordinates):
+            # Pythagoras's theorem return math.sqrt(((self.position[0] - objectCoordinates[0]) ** 2) + ((
+            # self.position[1] - objectCoordinates[1]) ** 2))
+            return [(2 - objectCoordinates[0]), (2 - objectCoordinates[1])]
+
+        visGrid = self.sight(Grid)
+        objectTypes = ['-1', '101', '1']
+        objectTypeDict = {
+            '-1': 'deadBody',
+            '101': 'organism',
+            '1': 'resource'
+        }
+
+        outList = []
+
+        for objectType in objectTypes:
+            # Is here, time to find
+            for y, row in enumerate(visGrid):
+                if objectType in row:
+                    for x, element in enumerate(row):
+                        if objectType == element:
+                            outList.append([objectType, calcDistance([y, x])])
+
+        return sorted([[objectTypeDict[n[0]], n[1], abs(n[1][0]) + abs(n[1][1])] for n in outList],
+                      key=lambda ele: ele[2])
+
+    def eat(self, Grid):
         pass
 
     def fight(self):
@@ -260,185 +311,55 @@ class Organism:
         pass
 
     def decide(self, Grid):
-        visableGrid = self.sight(Grid)
+        def findDirection(coordinates):
+            directionList = []
+            if coordinates[0] > 0:
+                directionList.append("N")
+            elif coordinates[0] < 0:
+                directionList.append("S")
 
+            if coordinates[1] > 0:
+                directionList.append("W")
+            elif coordinates[1] < 0:
+                directionList.append("E")
 
+            return directionList
 
-class OrganismList:
-    global total_pop
+        if not self.alive:
+            return
 
-    def __init__(self, list_of_organisms):
-        self.organisms = list_of_organisms
+        objectsNearby = self.findObjectsInSight(Grid)
+        # Simple Algo, act towards whatever is closest
 
-    def total_alive(self):
-        return len([n for n in self.organisms if n.alive == True])
+        # decisionDict = {
+        #     'deadBody': 8 - self.behavior,
+        #     'organism': self.behavior,
+        #     'resource': 8 - self.behavior
+        # }
 
-    def total_dead(self):
-        return len([n for n in self.organisms if n.alive == False])
+        if not objectsNearby:
+            attemptingMove = True
+            while attemptingMove:
+                try:
+                    self.move(sample(["N", "S", "W", "E"], 1)[0])  # Nothing nearby, move randomly
+                    attemptingMove = False
+                except:
+                    pass
+            return
 
-    def purge_dead(self):
-        self.organisms = [n for n in self.organisms if n.alive == True]
+        decision = objectsNearby[0]  # Closest object
 
-    def feed(self):
-        [self.forage_subprocess(n) for n in self.organisms]
-        [self.hunt_subprocess(n) for n in self.organisms]
-
-    def forage_subprocess(self, org):
-        if org.alive:
-            odds = 0
-            odds += org.size / 2 - 3
-            odds += org.speed / 2 - 3
-
-            # Random Forage Amount
-            ForageAmt = random.randint(1, 3)
-            # Reward of this activity equal proportionate to specialization of this activity
-            ForageAmt = ForageAmt * 12 * (total_pop // self.total_alive()) * (8 - org.behavior)
-            org_roll = random.randint(1, 6) + odds
-
-            # Evaluate Roll
-            if org_roll <= 1:
-                foraged = 0
-            elif org_roll < 3:
-                foraged = ForageAmt // 2
-            elif org_roll >= 3:
-                foraged = ForageAmt
-
-            org.current_resources += foraged
-
-    def hunt_subprocess(self, org):
-        # Roll to check if fight
-        if org.alive:
-            have_not_fought = True
-            while have_not_fought:
-                if self.total_alive() < 2:
-                    have_not_fought = False
-                randomPick = sample(range(len(self.organisms)), 1)
-                rand_Org = self.organisms[randomPick[0]]
-
-                if rand_Org.id != org.id and rand_Org.alive == True:
-                    self.org_fight(org, rand_Org)
-                    have_not_fought = False
-
-    def org_fight(self, org1, org2):
-        # Determine Fight Score
-        # Try and catch
-        org1_dex_check = random.randint(1, 10) + org1.speed
-        org2_dex_check = random.randint(1, 10) + org2.speed
-        if org1_dex_check > org2_dex_check:
-            # Caught
-            # Attempt Fight
-            org1_fight_roll = random.randint(1, 10) + org1.size
-            org2_fight_roll = random.randint(1, 10) + org2.size
-
-            if org1_fight_roll > org2_fight_roll:
-                # Org 1 Wins
-                print(f"{org1.id} ate {org2.id}")
-                org2.alive = False
-                org1.current_resources += (25 * (total_pop // self.total_alive()) + org2.current_resources) * org1.behavior
-
-        org1.fights += 1
-        org2.fights += 1
-
-    def starved_super(self):
-        [self.starved_subprocess(n) for n in self.organisms]
-
-    # @staticmethod
-    def starved_subprocess(self, org):
-        if org.current_resources < org.resource_demand:
-            org.alive = False
-            org.murderer = "Starvation"
-
-    def reproduce_super(self):
-        [n.age_one_year() for n in self.organisms]
-        [self.reproduce_subprocess(n) for n in self.organisms]
-        [n.reset_resources() for n in self.organisms]
-
-    def reproduce_subprocess(self, org):
-        if org.alive == True and org.current_resources >= org.resource_demand:
-            print(f'{org.id} attempting reproduction')
-            have_not_reproduced = True
-            second_reproduction = False
-            while have_not_reproduced:
-                if self.total_alive() < 2:
-                    print("Parthenogenesis!")
-                    # Increase mutation at every node
-                    org.mutation_matrix = [x - 0.05 for x in org.mutation_matrix]
-                    # Reproduce 5 Times
-                    self.organisms.append(Organism(org, org))
-                    self.organisms.append(Organism(org, org))
-                    self.organisms.append(Organism(org, org))
-                    self.organisms.append(Organism(org, org))
-                    self.organisms.append(Organism(org, org))
-                randomPick = sample(range(len(self.organisms)), 1)
-                rand_Org = self.organisms[randomPick[0]]
-                if rand_Org.id != org.id and rand_Org.alive == True:
-                    self.organisms.append(Organism(org, rand_Org))
-                    self.organisms.append(Organism(org, rand_Org))
-                    self.organisms.append(Organism(org, rand_Org))
-                    org.mate = rand_Org.id
-                    rand_Org.mate = org.id
-                    if org.current_resources / 2 >= org.resource_demand and second_reproduction == False:
-                        second_reproduction = True
-                    else:
-                        second_reproduction = False
-
-                    if not second_reproduction:
-                        have_not_reproduced = False
-
-
-def year(Orgs, n_years=1, beginning_year=0):
-    global current_year
-    current_year = beginning_year
-    # os.mkdir('original')
-    outArray = []
-    for i in range(n_years):
-        start = timer()
-
-        print(f'--------------------YEAR {i} ------------------')
-        # plentiful (How many resources happen to be available this generation
-        living = Orgs.total_alive()
-        plentiful = random.randint(0, 3)
-        [n.add_resources(plentiful) for n in Orgs.organisms]
-        print(Orgs.total_alive())
-        # Forage
-        Orgs.feed()
-        Orgs.feed()
-
-        # print(f"{Orgs.total_alive()} are alive currently")
-
-        # df = pd.DataFrame.from_records([org.to_dict() for org in Orgs.organisms])
-
-        # df.to_csv(f"original//{i}_year_10K.csv")
-        current_year += 1
-
-        # Reproduce and Age
-        Orgs.reproduce_super()
-
-        Orgs.purge_dead()
-        end = timer()
-
-        outArray.append((end - start) / living)
-
-    return outArray
-
-
-if __name__ == '__main__':
-    start = timer()
-    # Create 12 organisms
-    organisms = []
-    total_pop = 1000
-    for i in range(total_pop):
-        organisms.append(Organism(first_gen=True))
-
-    Orgs = OrganismList(organisms)
-
-    print(Orgs.organisms[0].to_dict())
-    n_years = 500
-    timeArr = year(Orgs, n_years, current_year)
-    end = timer()
-
-    print(end - start)
-
-    print("Average: ", sum(timeArr) / len(timeArr))
-    print("Longest: ", max(timeArr))
-    print("Quickest: ", min(timeArr))
+        if 1 in decision[1]:  # check if any y or x direction is within 1 tile
+            # Close enough to act
+            # if decision[0] == 'deadBody':
+            #     self.eat(Grid)
+            pass  # Stop Moving
+        else:
+            attemptingMove = True
+            while attemptingMove:
+                try:
+                    self.move(
+                        sample(findDirection(decision[1]), 1)[0])  # pick random viable direction towards nearest object
+                    attemptingMove = False
+                except:
+                    pass

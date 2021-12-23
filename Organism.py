@@ -118,8 +118,8 @@ def parseGenome(genome):
 def randomPosition(grid):
     notFound = True
     while notFound:
-        y_temp = random.randint(0, np.size(grid[0]) - 1)
-        x_temp = random.randint(0, np.size(grid[0]) - 1)
+        y_temp = random.randint(0, np.size(grid[0]) - 2)
+        x_temp = random.randint(0, np.size(grid[0]) - 2)
         if grid[y_temp][x_temp] == 0:  # Is Empty
             return [y_temp, x_temp]
 
@@ -139,7 +139,7 @@ def findNearestEmpty(grid, p1coors, p2coors):
 class Organism:
     # Implement Binary Tree genealogy
 
-    def __init__(self, parent1=None, parent2=None, first_gen=False, Grid=None):
+    def __init__(self, parent1=None, parent2=None, first_gen=False, Env=None):
         global counter
         global current_year
         # Self Initialization
@@ -151,10 +151,11 @@ class Organism:
             self.parent1id = parent1
             self.parent2id = parent2
 
-            if Grid is None:
+            if Env is None:
                 self.position = [0, 0]  # y, x
             else:
-                self.position = randomPosition(Grid)
+                self.position = randomPosition(Env.grid)
+                Env.updateGrid(resourceBool=False)
             # Find the empty tile nearest both parents
         else:
             tempGenome = inherit(parent1.Genome, parent2.Genome, genome=True)  # function for inheritance
@@ -177,12 +178,13 @@ class Organism:
         self.speed = features[2]
         self.vision = 2
 
+        self.corpse = False
+
         # Check if Viable
         if "NonViable" in features:
-            self.viable = False
-            self.alive = False
-            self.murderer = "NonViable"
+            self.death("NonViable")
             self.resource_demand = 0
+
         else:
             self.viable = True
             self.alive = True
@@ -198,6 +200,15 @@ class Organism:
         self.age = 0
 
         counter += 1
+
+    def death(self, murderer):
+        self.alive = False
+        self.murderer = murderer
+        if random.randint(1, 10) > 5:
+            # Make corpse
+            self.corpse = True
+        if murderer == "NonViable":
+            self.viable = False
 
     def add_resources(self, amount):
         self.current_resources += amount
@@ -231,13 +242,14 @@ class Organism:
 
     def move(self, direction):
         if direction == "N":
-            self.position[0] += 1
-        elif direction == "S":
             self.position[0] -= 1
+        elif direction == "S":
+            self.position[0] += 1
         elif direction == "E":
             self.position[1] += 1
         else:  # W
             self.position[1] -= 1
+        print(f"Moving {direction}")
 
     def sight(self, Grid):
         y_lim = 5
@@ -275,28 +287,32 @@ class Organism:
                          range(y_lim)])
 
     def findObjectsInSight(self, Grid):
-        def calcDistance(objectCoordinates):
+        def calcDistance(objectCoordinates, origin_coor):
             # Pythagoras's theorem return math.sqrt(((self.position[0] - objectCoordinates[0]) ** 2) + ((
             # self.position[1] - objectCoordinates[1]) ** 2))
-            return [(2 - objectCoordinates[0]), (2 - objectCoordinates[1])]
+            return [(origin_coor[0] - objectCoordinates[0]), (origin_coor[1] - objectCoordinates[1])]
 
         visGrid = self.sight(Grid)
-        objectTypes = ['-1', '101', '1']
+        print(visGrid)
+        objectTypes = ['-1', '101', '1', "X"]
         objectTypeDict = {
             '-1': 'deadBody',
             '101': 'organism',
-            '1': 'resource'
+            '1': 'resource',
         }
 
         outList = []
 
-        for objectType in objectTypes:
-            # Is here, time to find
-            for y, row in enumerate(visGrid):
-                if objectType in row:
-                    for x, element in enumerate(row):
-                        if objectType == element:
-                            outList.append([objectType, calcDistance([y, x])])
+        for y, row in enumerate(visGrid):
+            if any([True if n in objectTypes else False for n in row]):
+                for x, element in enumerate(row):
+                    if element in objectTypes:
+                        if element == 'X':
+                            o_coor = [y, x]
+                        else:
+                            outList.append([element, [y, x]])
+
+        outList = [[n[0], calcDistance(n[1], o_coor)] for n in outList]
 
         return sorted([[objectTypeDict[n[0]], n[1], abs(n[1][0]) + abs(n[1][1])] for n in outList],
                       key=lambda ele: ele[2])
@@ -328,8 +344,11 @@ class Organism:
         if not self.alive:
             return
 
+        print(f"{self.id} at position {self.position} making a decision.")
+
         objectsNearby = self.findObjectsInSight(Grid)
         # Simple Algo, act towards whatever is closest
+        print(f"Nearby Objects: {objectsNearby}")
 
         # decisionDict = {
         #     'deadBody': 8 - self.behavior,
@@ -338,6 +357,7 @@ class Organism:
         # }
 
         if not objectsNearby:
+            print("Attempting Random Move, nothing nearby.")
             attemptingMove = True
             while attemptingMove:
                 try:
@@ -349,13 +369,15 @@ class Organism:
 
         decision = objectsNearby[0]  # Closest object
 
-        if 1 in decision[1]:  # check if any y or x direction is within 1 tile
+        if 1 == decision[2]:  # check if any y or x direction is within 1 tile
+            print(f"Close enough to {decision}")
             # Close enough to act
             # if decision[0] == 'deadBody':
             #     self.eat(Grid)
             pass  # Stop Moving
         else:
             attemptingMove = True
+            print(f"Moving towards {decision}")
             while attemptingMove:
                 try:
                     self.move(

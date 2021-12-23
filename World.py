@@ -23,7 +23,7 @@ class Env:
         self.grid = np.array([[0 for x in range(gridN)] for y in range(gridN)])
         self.Organisms = []
         for i in range(numStartingOrgs):
-            self.addOrganism(Organism(first_gen=True, Grid=self.grid))
+            self.addOrganism(Organism(first_gen=True, Env=self))
 
         self.resourceSpawns = []
         if nRes is None:
@@ -44,8 +44,10 @@ class Env:
         for org in self.Organisms:
             if org.alive:
                 unit = 101
-            else:
+            elif org.corpse:
                 unit = -1
+            else:
+                unit = 0
             self.grid[org.position[0]][org.position[1]] = unit
 
     def printGrid(self):

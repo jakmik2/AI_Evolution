@@ -118,8 +118,8 @@ def parseGenome(genome):
 def randomPosition(grid):
     notFound = True
     while notFound:
-        y_temp = random.randint(0, np.size(grid[0]) - 2)
-        x_temp = random.randint(0, np.size(grid[0]) - 2)
+        y_temp = random.randint(0, len(grid) - 2)
+        x_temp = random.randint(0, len(grid) - 2)
         if grid[y_temp][x_temp] == 0:  # Is Empty
             return [y_temp, x_temp]
 
@@ -129,11 +129,35 @@ def findNearestEmpty(grid, p1coors, p2coors):
     for i in range(-1, 1):
         for j in range(-1, 1):
             if grid[p1coors[0] + i][p1coors[1] + j] == 0:
-                if not any(x == -1 or x == np.size(grid) + 1 for x in [p1coors[0] + i, p1coors[1] + j]):
+                if not any(x == -1 or x == len(grid) + 1 for x in [p1coors[0] + i, p1coors[1] + j]):
                     return [p1coors[0] + i, p1coors[1] + j]
             if grid[p2coors[0] + i][p2coors[1] + j] == 0:
-                if not any(x == -1 or x == np.size(grid) + 1 for x in [p2coors[0] + i, p2coors[1] + j]):
+                if not any(x == -1 or x == len(grid) + 1 for x in [p2coors[0] + i, p2coors[1] + j]):
                     return [p2coors[0] + i, p2coors[1] + j]
+
+
+def gridToString(grid):
+    def convertEntries(element):
+        if str(type(element)) == "<class 'Organism.Organism'>":  # Is this an organism object?
+            if element.alive:
+                return 101
+            elif element.corpse:
+                return -1
+        elif str(type(element)) == "<class 'World.Resources'>":  # Is this a resource?
+            return 1
+        elif element == 'X':
+            return 'X'
+        return 0
+
+    # draw temp version of this grid
+    tempGrid = grid
+    out_string = ''
+    for y_array in tempGrid:
+        out_string += ''.join(
+            [str(convertEntries(x_elem)) + ' ' * (5 - len(str(convertEntries(x_elem)))) for x_elem in y_array])
+        out_string += '\n'
+
+    return out_string
 
 
 class Organism:
@@ -154,37 +178,31 @@ class Organism:
             if Env is None:
                 self.position = [0, 0]  # y, x
             else:
-                self.position = randomPosition(Env.grid)
-                Env.updateGrid(resourceBool=False)
+                self.position = randomPosition(Env.grid.grid)
             # Find the empty tile nearest both parents
         else:
             tempGenome = inherit(parent1.Genome, parent2.Genome, genome=True)  # function for inheritance
             tempMutation_Matrix = inherit(parent1.mutation_matrix, parent2.mutation_matrix)
             self.parent1id = parent1.id
             self.parent2id = parent2.id
-            if Grid is None:
+            if Env is None:
                 self.position = [0, 0]
             else:
-                self.position = findNearestEmpty(Grid, parent1.position, parent2.position)
+                self.position = findNearestEmpty(Env.grid.grid, parent1.position, parent2.position)
             # Find Random position on Grid
 
         self.mutation_matrix = mutate_matrix(tempMutation_Matrix)
         self.Genome = mutate_genome(tempGenome, self.mutation_matrix)
 
         # Initialize features / behaviors from Genome
-        features = parseGenome(self.Genome)
-        self.behavior = features[0]
-        self.size = features[1]
-        self.speed = features[2]
-        self.vision = 2
+        self.behavior, self.size, self.speed, self.vision = parseGenome(self.Genome)
 
         self.corpse = False
 
         # Check if Viable
-        if "NonViable" in features:
+        if "NonViable" in [self.behavior, self.size, self.speed]:
             self.death("NonViable")
             self.resource_demand = 0
-
         else:
             self.viable = True
             self.alive = True
@@ -240,7 +258,7 @@ class Organism:
     def age_one_year(self):
         self.age += 1
 
-    def move(self, direction):
+    def move(self, direction, Grid):
         if direction == "N":
             self.position[0] -= 1
         elif direction == "S":
@@ -250,14 +268,15 @@ class Organism:
         else:  # W
             self.position[1] -= 1
         print(f"Moving {direction}")
+        Grid.UpdatePosition(object=self, newCoordinates=self.position)
 
     def sight(self, Grid):
         y_lim = 5
         x_lim = 5
         x_origin = 2
         y_origin = 2
-        if (0 not in self.position and np.size(Grid[0]) - 1 not in self.position) and \
-                (1 not in self.position and np.size(Grid[0]) - 2 not in self.position):
+        if (0 not in self.position and len(Grid[0]) - 1 not in self.position) and \
+                (1 not in self.position and len(Grid[0]) - 2 not in self.position):
             pass
         else:
             if 0 == self.position[0]:  # Within 1 of Upper Wall
@@ -266,9 +285,9 @@ class Organism:
             elif 1 == self.position[0]:  # Within 2 of Upper Wall
                 y_origin = 1
                 y_lim = 4
-            elif np.size(Grid[0]) - 1 == self.position[0]:  # Within 1 of Lower Wall
+            elif len(Grid[0]) - 1 == self.position[0]:  # Within 1 of Lower Wall
                 y_lim = 3
-            elif np.size(Grid[0]) - 2 == self.position[0]:  # Within 1 of Lower Wall
+            elif len(Grid[0]) - 2 == self.position[0]:  # Within 1 of Lower Wall
                 y_lim = 4
 
             if 0 == self.position[1]:  # Within 1 of Left Wall
@@ -277,14 +296,14 @@ class Organism:
             elif 1 == self.position[1]:  # Within 2 of Left Wall
                 x_origin = 1
                 x_lim = 4
-            elif np.size(Grid[0]) - 1 == self.position[1]:  # Within 1 of Right Wall
+            elif len(Grid[0]) - 1 == self.position[1]:  # Within 1 of Right Wall
                 x_lim = 3
-            elif np.size(Grid[0]) - 2 == self.position[1]:  # Within 2 of Right Wall
+            elif len(Grid[0]) - 2 == self.position[1]:  # Within 2 of Right Wall
                 x_lim = 4
 
-        return np.array([[Grid[self.position[0] - y_origin + i][self.position[1] - x_origin + j]
+        return [[Grid[self.position[0] - y_origin + i][self.position[1] - x_origin + j]
                           if (i != y_origin or j != x_origin) else "X" for j in range(x_lim)] for i in
-                         range(y_lim)])
+                         range(y_lim)]
 
     def findObjectsInSight(self, Grid):
         def calcDistance(objectCoordinates, origin_coor):
@@ -293,7 +312,7 @@ class Organism:
             return [(origin_coor[0] - objectCoordinates[0]), (origin_coor[1] - objectCoordinates[1])]
 
         visGrid = self.sight(Grid)
-        print(visGrid)
+        print(gridToString(visGrid))
         objectTypes = ['-1', '101', '1', "X"]
         objectTypeDict = {
             '-1': 'deadBody',
@@ -317,8 +336,15 @@ class Organism:
         return sorted([[objectTypeDict[n[0]], n[1], abs(n[1][0]) + abs(n[1][1])] for n in outList],
                       key=lambda ele: ele[2])
 
-    def eat(self, Grid):
-        pass
+    def eat(self, decision):
+        # Decision[1] should contain the relative coordinates the object with which the organism is interacting
+        if decision[0] == 'deadBody':
+            self.current_resources += 2 # Dead bodies equal to 2?
+        elif decision[0] == 'resource':
+            self.current_resources += 5 # Resources are more rewarding
+        elif decision[0] == 'organism':
+            # Initiate fight
+            pass
 
     def fight(self):
         pass
@@ -346,7 +372,7 @@ class Organism:
 
         print(f"{self.id} at position {self.position} making a decision.")
 
-        objectsNearby = self.findObjectsInSight(Grid)
+        objectsNearby = self.findObjectsInSight(Grid.grid)
         # Simple Algo, act towards whatever is closest
         print(f"Nearby Objects: {objectsNearby}")
 
@@ -361,7 +387,7 @@ class Organism:
             attemptingMove = True
             while attemptingMove:
                 try:
-                    self.move(sample(["N", "S", "W", "E"], 1)[0])  # Nothing nearby, move randomly
+                    self.move(sample(["N", "S", "W", "E"], 1)[0], Grid)  # Nothing nearby, move randomly
                     attemptingMove = False
                 except:
                     pass
@@ -381,7 +407,9 @@ class Organism:
             while attemptingMove:
                 try:
                     self.move(
-                        sample(findDirection(decision[1]), 1)[0])  # pick random viable direction towards nearest object
+                        sample(findDirection(decision[1]), 1)[0], Grid)  # pick random viable direction towards nearest object
                     attemptingMove = False
                 except:
                     pass
+
+

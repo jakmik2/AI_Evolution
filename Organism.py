@@ -259,6 +259,7 @@ class Organism:
         self.age += 1
 
     def move(self, direction, Grid):
+        oldCoord = [self.position[0], self.position[1]]
         if direction == "N":
             self.position[0] -= 1
         elif direction == "S":
@@ -268,7 +269,7 @@ class Organism:
         else:  # W
             self.position[1] -= 1
         print(f"Moving {direction}")
-        Grid.UpdatePosition(object=self, newCoordinates=self.position)
+        Grid.UpdatePosition(gridObject=self, oldCoordinates=oldCoord, newCoordinates=self.position)
 
     def sight(self, Grid):
         y_lim = 5
@@ -302,8 +303,8 @@ class Organism:
                 x_lim = 4
 
         return [[Grid[self.position[0] - y_origin + i][self.position[1] - x_origin + j]
-                          if (i != y_origin or j != x_origin) else "X" for j in range(x_lim)] for i in
-                         range(y_lim)]
+                 if (i != y_origin or j != x_origin) else "X" for j in range(x_lim)] for i in
+                range(y_lim)]
 
     def findObjectsInSight(self, Grid):
         def calcDistance(objectCoordinates, origin_coor):
@@ -313,7 +314,7 @@ class Organism:
 
         visGrid = self.sight(Grid)
         print(gridToString(visGrid))
-        objectTypes = ['-1', '101', '1', "X"]
+        objectTypes = ["<class 'Organism.Organism'>", "<class '__main__.Resources'>", "<class 'int'>", "<class 'str'>"]
         objectTypeDict = {
             '-1': 'deadBody',
             '101': 'organism',
@@ -323,14 +324,19 @@ class Organism:
         outList = []
 
         for y, row in enumerate(visGrid):
-            if any([True if n in objectTypes else False for n in row]):
+            if any([True if n in objectTypes else False for n in [str(type(x)) for x in row]]):
                 for x, element in enumerate(row):
-                    if element in objectTypes:
-                        if element == 'X':
+                    test_ele = str(type(element))
+                    if test_ele in objectTypes:
+                        if test_ele == "<class 'str'>":
                             o_coor = [y, x]
-                        else:
-                            outList.append([element, [y, x]])
-
+                        elif test_ele == "<class 'Organism.Organism'>": # Check if org
+                            if element.alive:
+                                outList.append(['101', [y, x]])
+                            elif element.corpse:
+                                outList.append(['-1', [y, x]])
+                        elif test_ele == "<class '__main__.Resources'>": # Check if resource
+                            outList.append(['1', [y, x]])
         outList = [[n[0], calcDistance(n[1], o_coor)] for n in outList]
 
         return sorted([[objectTypeDict[n[0]], n[1], abs(n[1][0]) + abs(n[1][1])] for n in outList],
@@ -339,9 +345,9 @@ class Organism:
     def eat(self, decision):
         # Decision[1] should contain the relative coordinates the object with which the organism is interacting
         if decision[0] == 'deadBody':
-            self.current_resources += 2 # Dead bodies equal to 2?
+            self.current_resources += 2  # Dead bodies equal to 2?
         elif decision[0] == 'resource':
-            self.current_resources += 5 # Resources are more rewarding
+            self.current_resources += 5  # Resources are more rewarding
         elif decision[0] == 'organism':
             # Initiate fight
             pass
@@ -407,9 +413,8 @@ class Organism:
             while attemptingMove:
                 try:
                     self.move(
-                        sample(findDirection(decision[1]), 1)[0], Grid)  # pick random viable direction towards nearest object
+                        sample(findDirection(decision[1]), 1)[0],
+                        Grid)  # pick random viable direction towards nearest object
                     attemptingMove = False
                 except:
                     pass
-
-

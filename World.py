@@ -28,19 +28,20 @@ class Grid:
         self.dictTracker[newObject] = [newObject.position[0], newObject.position[1]]
         self.drawFromDict(newObject)
 
-    def drawFromDict(self, object, empty=False):
+    def drawFromDict(self, gridObject, empty=False):
         if empty:
-            print(f"Old Coordinates {self.dictTracker[object]}")
-            self.grid[self.dictTracker[object][0]][self.dictTracker[object][1]] = 0
+            print(f"Old Coordinates {gridObject}")
+            self.grid[gridObject[0]][gridObject[1]] = 0
         else:
-            print(f"New Coordinates {self.dictTracker[object]}")
-            self.grid[self.dictTracker[object][0]][self.dictTracker[object][1]] = object
+            print(f"New Coordinates {self.dictTracker[gridObject]}")
+            self.grid[self.dictTracker[gridObject][0]][self.dictTracker[gridObject][1]] = gridObject
 
-    def UpdatePosition(self, object, newCoordinates):
+    def UpdatePosition(self, gridObject, oldCoordinates, newCoordinates):
         # Put 0 in Old Coordinates
-        self.drawFromDict(object, empty=True)
-        self.dictTracker[object] = newCoordinates
-        self.drawFromDict(object)
+        self.drawFromDict(oldCoordinates, empty=True)
+        self.dictTracker[gridObject] = newCoordinates
+        self.drawFromDict(gridObject)
+        print(self.dictTracker[gridObject])
 
     def printGrid(self):
         print(gridToString(self.grid))

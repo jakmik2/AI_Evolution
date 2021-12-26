@@ -8,7 +8,7 @@ import ctypes
 from timeit import default_timer as timer
 
 
-class Resources:
+class Resource:
     def __init__(self, grid, amt=10):
         self.resources_available = amt  # This should be examined
         self.position = randomPosition(grid)
@@ -16,10 +16,13 @@ class Resources:
     def newYear(self):
         self.resources_available = random.randint(5, 15)
 
+    def consume(self):
+        self.resources_available -= 1
+
 
 class Grid:
     def __init__(self, grid):
-        self.grid = grid
+        self.data = grid
         self.dim = len(grid[0])
         self.dictTracker = {}
 
@@ -31,10 +34,10 @@ class Grid:
     def drawFromDict(self, gridObject, empty=False):
         if empty:
             print(f"Old Coordinates {gridObject}")
-            self.grid[gridObject[0]][gridObject[1]] = 0
+            self.data[gridObject[0]][gridObject[1]] = 0
         else:
             print(f"New Coordinates {self.dictTracker[gridObject]}")
-            self.grid[self.dictTracker[gridObject][0]][self.dictTracker[gridObject][1]] = gridObject
+            self.data[self.dictTracker[gridObject][0]][self.dictTracker[gridObject][1]] = gridObject
 
     def UpdatePosition(self, gridObject, oldCoordinates, newCoordinates):
         # Put 0 in Old Coordinates
@@ -44,7 +47,7 @@ class Grid:
         print(self.dictTracker[gridObject])
 
     def printGrid(self):
-        print(gridToString(self.grid))
+        print(gridToString(self.data))
 
 
 class Env:
@@ -62,7 +65,7 @@ class Env:
             tempAmt = nRes
 
         for i in range(tempAmt):
-            self.addResourceSpawn(Resources(self.grid.grid, tempAmt))  # This is a fucking mess
+            self.addResourceSpawn(Resource(self.grid.data, tempAmt))  # This is a fucking mess
 
     def addOrganism(self, newOrg):
         self.grid.add_object_to_grid(newOrg)
@@ -77,9 +80,13 @@ class Env:
         self.grid.printGrid()
 
 
-if __name__ == '__main__':
+def main():
     Ecosystem = Env(25, 100)
     # find living org
     Ecosystem.grid.printGrid()
     for i in range(10):  # ten turns
         Ecosystem.tickEnv()
+
+
+if __name__ == '__main__':
+    main()

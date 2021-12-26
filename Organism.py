@@ -178,7 +178,7 @@ class Organism:
             if Env is None:
                 self.position = [0, 0]  # y, x
             else:
-                self.position = randomPosition(Env.grid.grid)
+                self.position = randomPosition(Env.grid.data)
             # Find the empty tile nearest both parents
         else:
             tempGenome = inherit(parent1.Genome, parent2.Genome, genome=True)  # function for inheritance
@@ -188,7 +188,7 @@ class Organism:
             if Env is None:
                 self.position = [0, 0]
             else:
-                self.position = findNearestEmpty(Env.grid.grid, parent1.position, parent2.position)
+                self.position = findNearestEmpty(Env.grid.data, parent1.position, parent2.position)
             # Find Random position on Grid
 
         self.mutation_matrix = mutate_matrix(tempMutation_Matrix)
@@ -258,17 +258,22 @@ class Organism:
     def age_one_year(self):
         self.age += 1
 
-    def move(self, direction, Grid):
+    def move(self, direction, Grid, reverse = 1):
+        # TODO: Add chance of moving twice based on speed stat
         oldCoord = [self.position[0], self.position[1]]
         if direction == "N":
-            self.position[0] -= 1
+            self.position[0] -= 1 * reverse
         elif direction == "S":
-            self.position[0] += 1
+            self.position[0] += 1 * reverse
         elif direction == "E":
-            self.position[1] += 1
+            self.position[1] += 1 * reverse
         else:  # W
-            self.position[1] -= 1
-        print(f"Moving {direction}")
+            self.position[1] -= 1 * reverse
+        if reverse == 1:
+            print(f"Moving {direction}")
+        else:
+            reverseDict = {"W": "E", "N": "S", 'E': 'W', 'S':'N'}
+            print(f"Moving {reverseDict[direction]}")
         Grid.UpdatePosition(gridObject=self, oldCoordinates=oldCoord, newCoordinates=self.position)
 
     def sight(self, Grid):
@@ -332,31 +337,63 @@ class Organism:
                             o_coor = [y, x]
                         elif test_ele == "<class 'Organism.Organism'>": # Check if org
                             if element.alive:
-                                outList.append(['101', [y, x]])
+                                outList.append(['101', [y, x], element])
                             elif element.corpse:
-                                outList.append(['-1', [y, x]])
+                                outList.append(['-1', [y, x], element])
                         elif test_ele == "<class '__main__.Resources'>": # Check if resource
-                            outList.append(['1', [y, x]])
-        outList = [[n[0], calcDistance(n[1], o_coor)] for n in outList]
+                            outList.append(['1', [y, x], element])
+        outList = [[n[0], calcDistance(n[1], o_coor), n[2]] for n in outList]
 
-        return sorted([[objectTypeDict[n[0]], n[1], abs(n[1][0]) + abs(n[1][1])] for n in outList],
+        return sorted([[objectTypeDict[n[0]], n[1], abs(n[1][0]) + abs(n[1][1]), n[2]] for n in outList],
                       key=lambda ele: ele[2])
 
-    def eat(self, decision):
+    def eat(self, decision, Grid):
         # Decision[1] should contain the relative coordinates the object with which the organism is interacting
         if decision[0] == 'deadBody':
+            print("Eating Dead Body")
             self.current_resources += 2  # Dead bodies equal to 2?
+            # Consume the object
+            decision[3].corpse = False
+            Grid.drawFromDict([decision[3].position[0], decision[3].position[1]], empty=True)
         elif decision[0] == 'resource':
+            print(f"Eating Resource")
             self.current_resources += 5  # Resources are more rewarding
+            decision[3].consume()
         elif decision[0] == 'organism':
-            # Initiate fight
-            pass
+            self.fight(decision[3], Grid)
 
-    def fight(self):
-        pass
+    def fight(self, opponent, Grid):
+        print(f"{self.id} fighting {opponent.id}")
+        # How should fighting work?
+        offensive = random.randint(1, 10) + self.size
+        defensive = random.randint(1, 10) + opponent.size
+
+        # Victor takes some resources, dictated by the degree of victory
+        # If the loser has no resources, they die and the victor gets extra
+        if offensive > defensive:
+            # Offense wins
+            winner = self
+            loser = opponent
+        else: # defense wins ties
+            winner = opponent
+            loser = self
+
+        # Check loser's resources
+        if loser.current_resources > 0:
+            # take away 2, 1 at a time and give double that to the victor
+            counter = 2
+            while loser.current_resources > 0 and counter > 0:
+                winner.current_resources += 2
+                loser.current_resources -= 1
+                counter -= 1
+
+        # If loser has been drained, kill them
+        if loser.current_resources <= 0:
+            loser.death(winner)
+            Grid.drawFromDict([loser.position[0], loser.position[1]], empty=True)
 
     def reproduce(self):
-        pass
+        pass # TODO: When and how reproduction works
 
     def decide(self, Grid):
         def findDirection(coordinates):
@@ -378,7 +415,7 @@ class Organism:
 
         print(f"{self.id} at position {self.position} making a decision.")
 
-        objectsNearby = self.findObjectsInSight(Grid.grid)
+        objectsNearby = self.findObjectsInSight(Grid.data)
         # Simple Algo, act towards whatever is closest
         print(f"Nearby Objects: {objectsNearby}")
 
@@ -404,9 +441,25 @@ class Organism:
         if 1 == decision[2]:  # check if any y or x direction is within 1 tile
             print(f"Close enough to {decision}")
             # Close enough to act
-            # if decision[0] == 'deadBody':
-            #     self.eat(Grid)
-            pass  # Stop Moving
+            if decision[0] == 'deadBody':
+                self.eat(decision, Grid)
+            if decision[0] == 'organism':
+                # Fight or Flight
+                roll = random.randint(1, 8)
+                if roll < self.behavior:
+                    self.eat(decision, Grid)
+                else:
+                    attemptingMove = True
+                    print(f"Moving Away From {decision}")
+                    while attemptingMove:
+                        try:
+                            self.move(
+                                sample(findDirection(decision[1]), 1)[0],
+                                Grid, reverse=-1)  # pick random viable direction towards nearest object
+                            attemptingMove = False
+                        except:
+                            pass
+
         else:
             attemptingMove = True
             print(f"Moving towards {decision}")

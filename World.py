@@ -1,4 +1,5 @@
 from Organism import *
+from graphics import *
 
 import numpy as np
 import random
@@ -10,41 +11,87 @@ from timeit import default_timer as timer
 
 class Resource:
     def __init__(self, grid, amt=10):
+        print("Attempting to place a Resource")
         self.resources_available = amt  # This should be examined
         self.position = randomPosition(grid)
+        self.empty = False
 
     def newYear(self):
         self.resources_available = random.randint(5, 15)
 
     def consume(self):
-        self.resources_available -= 1
+        if not self.empty:
+            self.resources_available -= 1
+            if self.resources_available == 0:
+                self.empty = True
 
 
 class Grid:
-    def __init__(self, grid):
+    def __init__(self, grid, windowdim=[2560, 1440]):
         self.data = grid
+        self.windowdim = windowdim
         self.dim = len(grid[0])
-        self.dictTracker = {}
+        self.position_dict = {}
+        self.drawing_dict = {}
+        self.y_step = windowdim[1] // self.dim
+        self.x_step = windowdim[0] // self.dim
+        self.beginDrawing()
+
+    def beginDrawing(self):
+        self.win = GraphWin("AI Evolution", self.windowdim[0], self.windowdim[1])
 
     def add_object_to_grid(self, newObject):
         # Find position and replace 0 with the organism object
-        self.dictTracker[newObject] = [newObject.position[0], newObject.position[1]]
+        self.position_dict[newObject] = [newObject.position[0], newObject.position[1]]
         self.drawFromDict(newObject)
+        # Determine what object it is
+        objectTypes = []
 
-    def drawFromDict(self, gridObject, empty=False):
+        if str(type(newObject)) == "<class 'Organism.Organism'>":
+            if newObject.alive:
+                self.drawing_dict[newObject] = Circle(
+                    Point((self.position_dict[newObject][1] * self.x_step) + self.x_step // 2,
+                          (self.position_dict[newObject][0] * self.y_step) + self.y_step // 2),
+                    self.y_step // 2)
+
+                self.drawing_dict[newObject].setFill(color_rgb(120, 120, 120))
+                self.drawing_dict[newObject].draw(self.win)
+            elif newObject.corpse:
+                self.drawing_dict[newObject] = Circle(
+                    Point((self.position_dict[newObject][1] * self.x_step) + self.x_step // 2,
+                          (self.position_dict[newObject][0] * self.y_step) + self.y_step // 2),
+                    self.y_step // 2)
+
+                self.drawing_dict[newObject].setFill(color_rgb(0, 0, 0))
+                self.drawing_dict[newObject].draw(self.win)
+        elif str(type(newObject)) == "<class '__main__.Resource'>":
+            print(newObject)
+            if not newObject.empty:
+                self.drawing_dict[newObject] = Circle(
+                    Point((self.position_dict[newObject][1] * self.x_step) + self.x_step // 2,
+                          (self.position_dict[newObject][0] * self.y_step) + self.y_step // 2),
+                    self.y_step // 2)
+
+                self.drawing_dict[newObject].setFill(color_rgb(120, 0, 120))
+                self.drawing_dict[newObject].draw(self.win)
+
+    def drawFromDict(self, gridObject, empty=False, moving=False):
         if empty:
-            print(f"Old Coordinates {gridObject}")
-            self.data[gridObject[0]][gridObject[1]] = 0
-        else:
-            print(f"New Coordinates {self.dictTracker[gridObject]}")
-            self.data[self.dictTracker[gridObject][0]][self.dictTracker[gridObject][1]] = gridObject
+            self.drawing_dict[gridObject].undraw()
+            self.data[self.position_dict[gridObject][0]][self.position_dict[gridObject][1]] = 0
+            del self.position_dict[gridObject]
+            return
+        if moving:
+            self.data[gridObject.last_position[0]][gridObject.last_position[1]] = 0
+        self.data[self.position_dict[gridObject][0]][self.position_dict[gridObject][1]] = gridObject
 
     def UpdatePosition(self, gridObject, oldCoordinates, newCoordinates):
         # Put 0 in Old Coordinates
-        self.drawFromDict(oldCoordinates, empty=True)
-        self.dictTracker[gridObject] = newCoordinates
-        self.drawFromDict(gridObject)
-        print(self.dictTracker[gridObject])
+        self.position_dict[gridObject] = gridObject.position
+        self.drawFromDict(gridObject, moving=True)
+        dx = newCoordinates[1] - oldCoordinates[1]
+        dy = newCoordinates[0] - oldCoordinates[0]
+        self.drawing_dict[gridObject].move(dx*self.x_step, dy*self.y_step)
 
     def printGrid(self):
         print(gridToString(self.data))
@@ -65,7 +112,7 @@ class Env:
             tempAmt = nRes
 
         for i in range(tempAmt):
-            self.addResourceSpawn(Resource(self.grid.data, tempAmt))  # This is a fucking mess
+            self.addResourceSpawn(Resource(self.grid.data, tempAmt))
 
     def addOrganism(self, newOrg):
         self.grid.add_object_to_grid(newOrg)
@@ -82,10 +129,14 @@ class Env:
 
 def main():
     Ecosystem = Env(25, 100)
-    # find living org
+
     Ecosystem.grid.printGrid()
-    for i in range(10):  # ten turns
+
+    for i in range(25):  # ten turns
+        Ecosystem.grid.win.getMouse()
         Ecosystem.tickEnv()
+
+    Ecosystem.grid.win.getMouse()
 
 
 if __name__ == '__main__':

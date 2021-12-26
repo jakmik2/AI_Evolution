@@ -143,7 +143,7 @@ def gridToString(grid):
                 return 101
             elif element.corpse:
                 return -1
-        elif str(type(element)) == "<class 'World.Resources'>":  # Is this a resource?
+        elif str(type(element)) == "<class '__main__.Resource'>":  # Is this a resource?
             return 1
         elif element == 'X':
             return 'X'
@@ -191,6 +191,8 @@ class Organism:
                 self.position = findNearestEmpty(Env.grid.data, parent1.position, parent2.position)
             # Find Random position on Grid
 
+        self.last_position = [self.position[0], self.position[1]]
+
         self.mutation_matrix = mutate_matrix(tempMutation_Matrix)
         self.Genome = mutate_genome(tempGenome, self.mutation_matrix)
 
@@ -222,7 +224,7 @@ class Organism:
     def death(self, murderer):
         self.alive = False
         self.murderer = murderer
-        if random.randint(1, 10) > 5:
+        if random.randint(1, 10) > 9:
             # Make corpse
             self.corpse = True
         if murderer == "NonViable":
@@ -258,9 +260,9 @@ class Organism:
     def age_one_year(self):
         self.age += 1
 
-    def move(self, direction, Grid, reverse = 1):
+    def move_org(self, direction, Grid, reverse=1):
+        self.last_position = [self.position[0], self.position[1]]
         # TODO: Add chance of moving twice based on speed stat
-        oldCoord = [self.position[0], self.position[1]]
         if direction == "N":
             self.position[0] -= 1 * reverse
         elif direction == "S":
@@ -272,9 +274,9 @@ class Organism:
         if reverse == 1:
             print(f"Moving {direction}")
         else:
-            reverseDict = {"W": "E", "N": "S", 'E': 'W', 'S':'N'}
+            reverseDict = {"W": "E", "N": "S", 'E': 'W', 'S': 'N'}
             print(f"Moving {reverseDict[direction]}")
-        Grid.UpdatePosition(gridObject=self, oldCoordinates=oldCoord, newCoordinates=self.position)
+        Grid.UpdatePosition(gridObject=self, oldCoordinates=self.last_position, newCoordinates=self.position)
 
     def sight(self, Grid):
         y_lim = 5
@@ -319,7 +321,7 @@ class Organism:
 
         visGrid = self.sight(Grid)
         print(gridToString(visGrid))
-        objectTypes = ["<class 'Organism.Organism'>", "<class '__main__.Resources'>", "<class 'int'>", "<class 'str'>"]
+        objectTypes = ["<class 'Organism.Organism'>", "<class '__main__.Resource'>", "<class 'int'>", "<class 'str'>"]
         objectTypeDict = {
             '-1': 'deadBody',
             '101': 'organism',
@@ -335,12 +337,12 @@ class Organism:
                     if test_ele in objectTypes:
                         if test_ele == "<class 'str'>":
                             o_coor = [y, x]
-                        elif test_ele == "<class 'Organism.Organism'>": # Check if org
+                        elif test_ele == "<class 'Organism.Organism'>":  # Check if org
                             if element.alive:
                                 outList.append(['101', [y, x], element])
                             elif element.corpse:
                                 outList.append(['-1', [y, x], element])
-                        elif test_ele == "<class '__main__.Resources'>": # Check if resource
+                        elif test_ele == "<class '__main__.Resource'>":  # Check if resource
                             outList.append(['1', [y, x], element])
         outList = [[n[0], calcDistance(n[1], o_coor), n[2]] for n in outList]
 
@@ -354,7 +356,7 @@ class Organism:
             self.current_resources += 2  # Dead bodies equal to 2?
             # Consume the object
             decision[3].corpse = False
-            Grid.drawFromDict([decision[3].position[0], decision[3].position[1]], empty=True)
+            Grid.drawFromDict(decision[3], empty=True)
         elif decision[0] == 'resource':
             print(f"Eating Resource")
             self.current_resources += 5  # Resources are more rewarding
@@ -374,7 +376,7 @@ class Organism:
             # Offense wins
             winner = self
             loser = opponent
-        else: # defense wins ties
+        else:  # defense wins ties
             winner = opponent
             loser = self
 
@@ -390,10 +392,10 @@ class Organism:
         # If loser has been drained, kill them
         if loser.current_resources <= 0:
             loser.death(winner)
-            Grid.drawFromDict([loser.position[0], loser.position[1]], empty=True)
+            Grid.drawFromDict(loser, empty=True)
 
     def reproduce(self):
-        pass # TODO: When and how reproduction works
+        pass  # TODO: When and how reproduction works
 
     def decide(self, Grid):
         def findDirection(coordinates):
@@ -430,7 +432,7 @@ class Organism:
             attemptingMove = True
             while attemptingMove:
                 try:
-                    self.move(sample(["N", "S", "W", "E"], 1)[0], Grid)  # Nothing nearby, move randomly
+                    self.move_org(sample(["N", "S", "W", "E"], 1)[0], Grid)  # Nothing nearby, move randomly
                     attemptingMove = False
                 except:
                     pass
@@ -453,7 +455,7 @@ class Organism:
                     print(f"Moving Away From {decision}")
                     while attemptingMove:
                         try:
-                            self.move(
+                            self.move_org(
                                 sample(findDirection(decision[1]), 1)[0],
                                 Grid, reverse=-1)  # pick random viable direction towards nearest object
                             attemptingMove = False
@@ -465,7 +467,7 @@ class Organism:
             print(f"Moving towards {decision}")
             while attemptingMove:
                 try:
-                    self.move(
+                    self.move_org(
                         sample(findDirection(decision[1]), 1)[0],
                         Grid)  # pick random viable direction towards nearest object
                     attemptingMove = False

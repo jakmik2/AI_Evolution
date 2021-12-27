@@ -160,6 +160,21 @@ def gridToString(grid):
     return out_string
 
 
+def findDirection(coordinates):  # inputs decision coordinates and picks a random cardinal direction from it
+    directionList = []
+    if coordinates[0] > 0:
+        directionList.append("N")
+    elif coordinates[0] < 0:
+        directionList.append("S")
+
+    if coordinates[1] > 0:
+        directionList.append("W")
+    elif coordinates[1] < 0:
+        directionList.append("E")
+
+    return directionList
+
+
 class Organism:
     # Implement Binary Tree genealogy
 
@@ -260,20 +275,7 @@ class Organism:
     def age_one_year(self):
         self.age += 1
 
-    def move_org(self, Grid, decision=None, towards=True):
-        def findDirection(coordinates):  # inputs decision coordinates and picks a random cardinal direction from it
-            directionList = []
-            if coordinates[0] > 0:
-                directionList.append("N")
-            elif coordinates[0] < 0:
-                directionList.append("S")
-
-            if coordinates[1] > 0:
-                directionList.append("W")
-            elif coordinates[1] < 0:
-                directionList.append("E")
-
-            return directionList
+    def move_org(self, Grid, nonviable_directions, decision=None, towards=True):
 
         # TODO: detect if space is occupied, if so, it can't be entered
 
@@ -293,8 +295,6 @@ class Organism:
         attemptingToMove = True
 
         dir_list = ["N", "S", "W", "E"]
-
-        failsafe = 0
 
         if not towards:
             input_list = [reverseDict[n] for n in input_list]
@@ -317,8 +317,10 @@ class Organism:
             dir_list.pop(dir_list.index('E'))
 
         if len(input_list) == 0:  # TODO: Do not like this, needs to be fixed later
-            print('No desirable Valid Moves, making a random valid Move')
+            print('No desirable moves are valid, making a random valid Move')
             input_list = dir_list
+
+        input_list = [n for n in input_list if n not in nonviable_directions]
 
         if len(input_list) == 0:
             print('No valid moves')
@@ -327,8 +329,6 @@ class Organism:
             attemptingToMove = False
 
         while attemptingToMove:
-            failsafe += 1
-            # try:
 
             # TODO: Add chance of moving twice based on speed stat
 
@@ -342,19 +342,12 @@ class Organism:
                 self.position[1] += 1
             else:  # W
                 self.position[1] -= 1
-            if towards:
-                print(f"Moving {direction}")
-            else:
-                print(f"Moving {reverseDict[direction]}")
 
-            if failsafe > 5:
-                exit(1)
+            print(f"Moving {direction}")
 
             Grid.UpdatePosition(gridObject=self, oldCoordinates=self.last_position, newCoordinates=self.position)
 
             attemptingToMove = False
-            # except:
-            #     pass
 
     def sight(self, Grid):
         y_lim = 5
@@ -488,6 +481,12 @@ class Organism:
         pass  # TODO: When and how reproduction works
 
     def decide(self, Grid):
+        def identify_nonviable_directions(objects):
+            non_viable_routes = []
+            for object in objects:
+                if 1 == object[2]:
+                    non_viable_routes += findDirection(object[1])
+            return list(set(non_viable_routes))
 
         if not self.alive:
             return
@@ -504,9 +503,11 @@ class Organism:
         #     'resource': 8 - self.behavior
         # }
 
+        nonviable_routes = identify_nonviable_directions(objectsNearby)
+
         if not objectsNearby:  ## These movements are repetitive, could be improved
             print("Attempting Random Move, nothing nearby.")
-            self.move_org(Grid)
+            self.move_org(Grid, nonviable_routes)
             return
 
         decision = objectsNearby[0]  # Closest object
@@ -523,8 +524,8 @@ class Organism:
                     self.eat(decision, Grid)
                 else:
                     print(f"Moving Away From {decision}")
-                    self.move_org(Grid, decision, towards=False)
+                    self.move_org(Grid, nonviable_routes, decision, towards=False)
 
         else:
             print(f"Moving towards {decision}")
-            self.move_org(Grid, decision)
+            self.move_org(Grid, nonviable_routes, decision)

@@ -133,7 +133,7 @@ class Env:
         while amt != 0:
             for i in range(100):
                 self.tickEnv()
-                time.sleep(0.25)
+                time.sleep(0.2)
 
             [n.death("Starvation") for n in self.Organisms if n.current_resources < n.resource_demand ]
 
@@ -143,7 +143,7 @@ class Env:
 
 
 def main():
-    Ecosystem = Env(50, 500)
+    Ecosystem = Env(50, 1000)
 
     Ecosystem.grid.win.getMouse()
 

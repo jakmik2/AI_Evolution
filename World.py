@@ -129,7 +129,7 @@ class Env:
 
     def years(self, amt=1):
         def print_resources(x):
-            print(f"{x.current_resources} / {x.resource_demand}")
+            print(f" {x.id} : {x.current_resources} / {x.resource_demand}")
         while amt != 0:
             for i in range(100):
                 self.tickEnv()

@@ -309,6 +309,10 @@ class Organism:
             elif len(Grid[0]) - 2 == self.position[1]:  # Within 2 of Right Wall
                 x_lim = 4
 
+        print(f"{x_origin = }")
+        print(f"{y_origin = }")
+        print(f"{x_lim = }")
+        print(f"{y_lim = }")
         return [[Grid[self.position[0] - y_origin + i][self.position[1] - x_origin + j]
                  if (i != y_origin or j != x_origin) else "X" for j in range(x_lim)] for i in
                 range(y_lim)]
@@ -359,7 +363,7 @@ class Organism:
             Grid.drawFromDict(decision[3], empty=True)
         elif decision[0] == 'resource':
             print(f"Eating Resource")
-            self.current_resources += 500  # Resources are more rewarding
+            self.current_resources += 300  # Resources are more rewarding
             decision[3].consume(Grid)
         elif decision[0] == 'organism':
             self.fight(decision[3], Grid)
@@ -387,13 +391,15 @@ class Organism:
             # take away 400, 1 at a time and give triple that to the victor with a minimum of 800
             counter = 400
             while loser.current_resources > 0 and counter > 0:
-                winner.current_resources += 3
-                tracker += 3
+                winner.current_resources += 2
+                tracker += 2
                 loser.current_resources -= 1
                 counter -= 1
 
-        if tracker < 800:
-            winner.current_resources += 800 - tracker
+        minimum_rewared = 550
+
+        if tracker < minimum_rewared:
+            winner.current_resources += minimum_rewared - tracker
 
         # If loser has been drained, kill them
         if loser.current_resources <= 0:
@@ -476,22 +482,24 @@ class Organism:
                             print("Moving Away")
                             dir_list = findDirection(decision[1])
                             alt_list = ["N", "S", "W", "E"]
+
+                            # These are all reversed because they're being inverted in the move function
                             if self.position[0] == 0:  # Can't go North
-                                if "N" in dir_list:
-                                    dir_list.pop(dir_list.index('N'))
-                                alt_list.pop(alt_list.index('N'))
-                            elif self.position[0] == Grid.dim - 1:  # Can't go South
                                 if "S" in dir_list:
                                     dir_list.pop(dir_list.index('S'))
                                 alt_list.pop(alt_list.index('S'))
+                            elif self.position[0] == Grid.dim - 1:  # Can't go South
+                                if "N" in dir_list:
+                                    dir_list.pop(dir_list.index('N'))
+                                alt_list.pop(alt_list.index('N'))
                             if self.position[1] == 0:  # Can't go West
-                                if "W" in dir_list:
-                                    dir_list.pop(dir_list.index('W'))
-                                alt_list.pop(alt_list.index('W'))
-                            elif self.position[1] == Grid.dim - 1:  # Can't go East
                                 if "E" in dir_list:
                                     dir_list.pop(dir_list.index('E'))
                                 alt_list.pop(alt_list.index('E'))
+                            elif self.position[1] == Grid.dim - 1:  # Can't go East
+                                if "W" in dir_list:
+                                    dir_list.pop(dir_list.index('W'))
+                                alt_list.pop(alt_list.index('W'))
 
                             if len(dir_list) == 0: # TODO: Do not like this, needs to be fixed later
                                 print('No desirable Valid Moves, making a random valid Move')

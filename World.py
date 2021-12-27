@@ -19,15 +19,17 @@ class Resource:
     def newYear(self):
         self.resources_available = random.randint(5, 15)
 
-    def consume(self):
+    def consume(self, Grid):
         if not self.empty:
+            print(self.resources_available)
             self.resources_available -= 1
             if self.resources_available == 0:
                 self.empty = True
+                Grid.drawFromDict(self, empty = True)
 
 
 class Grid:
-    def __init__(self, grid, windowdim=[2560, 1440]):
+    def __init__(self, grid, windowdim=[1600, 1600]):
         self.data = grid
         self.windowdim = windowdim
         self.dim = len(grid[0])
@@ -124,17 +126,30 @@ class Env:
 
     def tickEnv(self):
         [n.decide(self.grid) for n in self.Organisms]
-        self.grid.printGrid()
+
+    def years(self, amt=1):
+        def print_resources(x):
+            print(f"{x.current_resources} / {x.resource_demand}")
+        while amt != 0:
+            for i in range(100):
+                self.tickEnv()
+                time.sleep(0.25)
+
+            [n.death("Starvation") for n in self.Organisms if n.current_resources < n.resource_demand ]
+
+            [print_resources(n) for n in [x for x in self.Organisms if x.alive]]
+            print(f'{len([n for n in self.Organisms if n.alive])*100/len([n for n in self.Organisms if n.murderer != "NonViable"])}%')
+            amt -= 1
 
 
 def main():
-    Ecosystem = Env(25, 100)
+    Ecosystem = Env(50, 500)
+
+    Ecosystem.grid.win.getMouse()
 
     Ecosystem.grid.printGrid()
 
-    for i in range(25):  # ten turns
-        Ecosystem.grid.win.getMouse()
-        Ecosystem.tickEnv()
+    Ecosystem.years()
 
     Ecosystem.grid.win.getMouse()
 

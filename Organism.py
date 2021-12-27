@@ -353,14 +353,14 @@ class Organism:
         # Decision[1] should contain the relative coordinates the object with which the organism is interacting
         if decision[0] == 'deadBody':
             print("Eating Dead Body")
-            self.current_resources += 2  # Dead bodies equal to 2?
+            self.current_resources += 100  # Dead bodies equal to 2?
             # Consume the object
             decision[3].corpse = False
             Grid.drawFromDict(decision[3], empty=True)
         elif decision[0] == 'resource':
             print(f"Eating Resource")
-            self.current_resources += 5  # Resources are more rewarding
-            decision[3].consume()
+            self.current_resources += 500  # Resources are more rewarding
+            decision[3].consume(Grid)
         elif decision[0] == 'organism':
             self.fight(decision[3], Grid)
 
@@ -380,14 +380,20 @@ class Organism:
             winner = opponent
             loser = self
 
+        tracker = 0
+
         # Check loser's resources
         if loser.current_resources > 0:
-            # take away 2, 1 at a time and give double that to the victor
-            counter = 2
+            # take away 400, 1 at a time and give triple that to the victor with a minimum of 800
+            counter = 400
             while loser.current_resources > 0 and counter > 0:
-                winner.current_resources += 2
+                winner.current_resources += 3
+                tracker += 3
                 loser.current_resources -= 1
                 counter -= 1
+
+        if tracker < 800:
+            winner.current_resources += 800 - tracker
 
         # If loser has been drained, kill them
         if loser.current_resources <= 0:
@@ -427,12 +433,23 @@ class Organism:
         #     'resource': 8 - self.behavior
         # }
 
-        if not objectsNearby:
+        if not objectsNearby:  ## These movements are repetitive, could be improved
             print("Attempting Random Move, nothing nearby.")
             attemptingMove = True
             while attemptingMove:
                 try:
-                    self.move_org(sample(["N", "S", "W", "E"], 1)[0], Grid)  # Nothing nearby, move randomly
+                    dir_list = ["N", "S", "W", "E"]
+                    if self.position[0] == 0:  # Can't go North
+                        dir_list.pop(dir_list.index('N'))
+                    elif self.position[0] == Grid.dim - 1:  # Can't go South
+                        dir_list.pop(dir_list.index('S'))
+
+                    if self.position[1] == 0:  # Can't go West
+                        dir_list.pop(dir_list.index('W'))
+                    elif self.position[1] == Grid.dim - 1:  # Can't go East
+                        dir_list.pop(dir_list.index('E'))
+
+                    self.move_org(sample(dir_list, 1)[0], Grid)  # Nothing nearby, move randomly
                     attemptingMove = False
                 except:
                     pass
@@ -443,9 +460,9 @@ class Organism:
         if 1 == decision[2]:  # check if any y or x direction is within 1 tile
             print(f"Close enough to {decision}")
             # Close enough to act
-            if decision[0] == 'deadBody':
+            if decision[0] in ['deadBody', 'resource']:
                 self.eat(decision, Grid)
-            if decision[0] == 'organism':
+            elif decision[0] == 'organism':
                 # Fight or Flight
                 roll = random.randint(1, 8)
                 if roll < self.behavior:
@@ -453,10 +470,45 @@ class Organism:
                 else:
                     attemptingMove = True
                     print(f"Moving Away From {decision}")
+                    fail_safe = 0
                     while attemptingMove:
                         try:
+                            print("Moving Away")
+                            dir_list = findDirection(decision[1])
+                            alt_list = ["N", "S", "W", "E"]
+                            if self.position[0] == 0:  # Can't go North
+                                if "N" in dir_list:
+                                    dir_list.pop(dir_list.index('N'))
+                                alt_list.pop(alt_list.index('N'))
+                            elif self.position[0] == Grid.dim - 1:  # Can't go South
+                                if "S" in dir_list:
+                                    dir_list.pop(dir_list.index('S'))
+                                alt_list.pop(alt_list.index('S'))
+                            if self.position[1] == 0:  # Can't go West
+                                if "W" in dir_list:
+                                    dir_list.pop(dir_list.index('W'))
+                                alt_list.pop(alt_list.index('W'))
+                            elif self.position[1] == Grid.dim - 1:  # Can't go East
+                                if "E" in dir_list:
+                                    dir_list.pop(dir_list.index('E'))
+                                alt_list.pop(alt_list.index('E'))
+
+                            if len(dir_list) == 0: # TODO: Do not like this, needs to be fixed later
+                                print('No desirable Valid Moves, making a random valid Move')
+                                dir_list = alt_list
+
+                            if len(dir_list) == 0:
+                                print('No valid moves, must fight')
+                                self.eat(decision, Grid)
+                                attemptingMove = False
+
+                            fail_safe += 1
+                            if fail_safe > 5:
+                                break
+                                exit(0)
+
                             self.move_org(
-                                sample(findDirection(decision[1]), 1)[0],
+                                sample(dir_list, 1)[0],
                                 Grid, reverse=-1)  # pick random viable direction towards nearest object
                             attemptingMove = False
                         except:
@@ -467,8 +519,37 @@ class Organism:
             print(f"Moving towards {decision}")
             while attemptingMove:
                 try:
+                    print("Moving Towards")
+                    dir_list = findDirection(decision[1])
+                    alt_list = ["N", "S", "W", "E"]
+                    if self.position[0] == 0:  # Can't go North
+                        if "N" in dir_list:
+                            dir_list.pop(dir_list.index('N'))
+                        alt_list.pop(alt_list.index('N'))
+                    elif self.position[0] == Grid.dim - 1:  # Can't go South
+                        if "S" in dir_list:
+                            dir_list.pop(dir_list.index('S'))
+                        alt_list.pop(alt_list.index('S'))
+                    if self.position[1] == 0:  # Can't go West
+                        if "W" in dir_list:
+                            dir_list.pop(dir_list.index('W'))
+                        alt_list.pop(alt_list.index('W'))
+                    elif self.position[1] == Grid.dim - 1:  # Can't go East
+                        if "E" in dir_list:
+                            dir_list.pop(dir_list.index('E'))
+                        alt_list.pop(alt_list.index('E'))
+
+                    if len(dir_list) == 0:  # TODO: Do not like this, needs to be fixed later
+                        print('No desirable Valid Moves, making a random valid Move')
+                        dir_list = alt_list
+
+                    if len(dir_list) == 0:
+                        print('No valid moves, must fight')
+                        self.eat(decision, Grid)
+                        attemptingMove = False
+
                     self.move_org(
-                        sample(findDirection(decision[1]), 1)[0],
+                        sample(dir_list, 1)[0],
                         Grid)  # pick random viable direction towards nearest object
                     attemptingMove = False
                 except:

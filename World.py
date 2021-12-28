@@ -10,7 +10,7 @@ from timeit import default_timer as timer
 
 
 class Resource:
-    def __init__(self, grid, amt=10):
+    def __init__(self, grid, amt=20):
         print("Attempting to place a Resource")
         self.resources_available = amt  # This should be examined
         self.position = randomPosition(grid)
@@ -109,12 +109,12 @@ class Env:
 
         self.resourceSpawns = []
         if nRes is None:
-            tempAmt = gridN // 5
+            tempAmt = gridN // 4
         else:
             tempAmt = nRes
 
         for i in range(tempAmt):
-            self.addResourceSpawn(Resource(self.grid.data, tempAmt))
+            self.addResourceSpawn(Resource(self.grid.data))
 
     def addOrganism(self, newOrg):
         self.grid.add_object_to_grid(newOrg)
@@ -133,7 +133,7 @@ class Env:
         while amt != 0:
             for i in range(100):
                 self.tickEnv()
-                time.sleep(0.2)
+                time.sleep(0.1)
 
             [n.death("Starvation") for n in self.Organisms if n.current_resources < n.resource_demand ]
 
@@ -143,7 +143,7 @@ class Env:
 
 
 def main():
-    Ecosystem = Env(50, 1000)
+    Ecosystem = Env(50, 500)
 
     Ecosystem.grid.win.getMouse()
 
